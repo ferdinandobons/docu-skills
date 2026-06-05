@@ -9,8 +9,8 @@ Covers the confirmed findings:
         literal ``surface.pptx.role_layout_map`` is gone.
   - M6  generation resolves layouts from the profile's real role data, never a
         hardcoded layout name or positional ``slide_layouts[0]/[1]`` fallback.
-  - M7  slides are built from the IR block stream — one slide per heading (its
-        own runs as the title), following blocks as that slide's body — with no
+  - M7  slides are built from the IR block stream - one slide per heading (its
+        own runs as the title), following blocks as that slide's body - with no
         flattening and without dropping tables / quotes / captions / lists.
 
 All decks are synthesized in a temp dir with python-pptx and never committed.
@@ -34,7 +34,7 @@ from brandkit.profile import schema
 
 
 # ---------------------------------------------------------------------------
-# Synthetic deck builders (temp only — NEVER committed)
+# Synthetic deck builders (temp only - NEVER committed)
 # ---------------------------------------------------------------------------
 def _branded_template(path: Path) -> None:
     """A deck whose layouts carry NON-default names, to prove the extractor and
@@ -101,7 +101,7 @@ def _all_text(prs: Presentation) -> str:
 
 
 # ---------------------------------------------------------------------------
-# C3 — roles derived from the REAL deck, not fabricated
+# C3 - roles derived from the REAL deck, not fabricated
 # ---------------------------------------------------------------------------
 class C3RolesFromRealLayouts(unittest.TestCase):
     def test_resolver_layouts_actually_exist_in_deck(self) -> None:
@@ -205,7 +205,7 @@ class C3RolesFromRealLayouts(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# M6 / M7 — generation uses real layouts + the IR block stream
+# M6 / M7 - generation uses real layouts + the IR block stream
 # ---------------------------------------------------------------------------
 class M6M7GenerateFromRealLayouts(unittest.TestCase):
     def _generate(self, template: Path, idoc_dict: dict, out: Path):
@@ -232,7 +232,7 @@ class M6M7GenerateFromRealLayouts(unittest.TestCase):
                 out,
             )
             used = {s.slide_layout.name for s in res.slides}
-            # Only the real renamed layouts — never a fabricated literal.
+            # Only the real renamed layouts - never a fabricated literal.
             self.assertTrue(used <= {"BrandCover", "BrandContent"}, used)
             self.assertNotIn("Title Slide", used)
             self.assertNotIn("Title and Content", used)

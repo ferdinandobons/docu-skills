@@ -4,7 +4,7 @@
 Covers:
 - M10 path traversal: a profile ``--name`` that is not a single safe path
   segment ('../../escape', absolute, with separators) is refused in BOTH
-  ``target_dir_for_save`` and ``resolve_profile_dir`` — a proprietary shell can
+  ``target_dir_for_save`` and ``resolve_profile_dir`` - a proprietary shell can
   never be written outside ``brand-kit/<name>``.
 - M11 zip-slip: ``ooxml.pack.unpack`` refuses a sibling-prefix escape entry
   (``../<dest>_SIBLING/x.txt``) that the old ``startswith`` prefix check let
@@ -31,7 +31,7 @@ from brandkit.profile import store
 
 
 # ---------------------------------------------------------------------------
-# M10 — profile name path traversal
+# M10 - profile name path traversal
 # ---------------------------------------------------------------------------
 class NameTraversalTest(unittest.TestCase):
     _BAD_NAMES = [
@@ -87,7 +87,7 @@ class NameTraversalTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# M11 — zip-slip
+# M11 - zip-slip
 # ---------------------------------------------------------------------------
 def _zip_with_entries(entries: dict[str, bytes]) -> bytes:
     buf = io.BytesIO()
@@ -156,7 +156,7 @@ class ZipSlipTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# ooxml-6 / security-4 — theme color parsing hardening
+# ooxml-6 / security-4 - theme color parsing hardening
 # ---------------------------------------------------------------------------
 _THEME_TEMPLATE = (
     b'<?xml version="1.0"?>'

@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: MIT
-"""DOCX style lookup — the single place that maps a resolver dict to a live style.
+"""DOCX style lookup - the single place that maps a resolver dict to a live style.
 
 This is the one bridge between a profile resolver (``{"style_id", "style_name",
 ...}``) and a python-docx ``Document``. It is deliberately tiny and shared by
 ``generate.py`` and ``cover.py`` so the brand guarantee has exactly one
 enforcement point: a writer can only ever apply a style the resolver named AND
 the shell actually carries. There is no literal style name anywhere in the
-writers — every style comes from the profile via :func:`lookup_style`.
+writers - every style comes from the profile via :func:`lookup_style`.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def lookup_style(doc, resolver: dict):
 
     A resolver matches a style when its ``style_id`` equals the style's
     ``style_id`` OR its ``style_name`` equals the style's ``name``. An empty
-    resolver (neither key set) never matches — returning None here is what stops
+    resolver (neither key set) never matches - returning None here is what stops
     the empty-resolver false match (every style's missing attributes compared
     against ``None``).
 

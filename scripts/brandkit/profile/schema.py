@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""The FROZEN Brand-Profile vocabulary — the single source of truth.
+"""The FROZEN Brand-Profile vocabulary - the single source of truth.
 
 Every other module imports its enum values, key names, and the ``profile.json``
 envelope shape from here. The plan (§3) froze the vocabulary to resolve the
@@ -18,8 +18,8 @@ cohesion conflicts between dimensions; this module *is* that freeze:
   finding severity is ``INFO`` | ``WARNING`` | ``ERROR`` (:class:`Severity`).
 
 Two helpers complete the contract:
-  - :func:`build_envelope` — construct a minimal, valid envelope skeleton.
-  - :func:`validate` — return a list of human-readable problems (``[]`` == ok).
+  - :func:`build_envelope` - construct a minimal, valid envelope skeleton.
+  - :func:`validate` - return a list of human-readable problems (``[]`` == ok).
 
 Plus role-id helpers (:func:`role_id`, :func:`parse_role_id`) so callers never
 hand-concatenate role ids like ``"heading.1"``.
@@ -149,7 +149,7 @@ DEFAULT_OVERFLOW_CAPABILITY: dict[str, str] = {
 }
 
 # The L0 invariant ids every profile declares it wants enforced (§3.2 qa).
-# NOTE: ``lists_use_named_numbering`` was removed (staged) — it was advertised in
+# NOTE: ``lists_use_named_numbering`` was removed (staged) - it was advertised in
 # every profile but enforced nowhere (no checker, not in ``registry.CHECKS``), so a
 # profile must not claim it. Re-add it here ONLY together with a real checker that
 # fails on a direct ``w:numPr`` not backed by a named numbering definition.
@@ -330,11 +330,11 @@ REQUIRED_TOP_KEYS: tuple[str, ...] = (
 def validate(profile: dict) -> list[str]:
     """Return a list of human-readable problems with ``profile`` (``[]`` == ok).
 
-    This is a *structural* checker — it verifies the frozen vocabulary is
+    This is a *structural* checker - it verifies the frozen vocabulary is
     respected (keys present, enum values legal, resolver types legal for the
     kind, role ids well-formed, the shell path matches the kind, the surface
     block matches the kind). It does NOT judge brand quality (that is the QA
-    gate's job) and never raises — it returns the problems so callers can decide
+    gate's job) and never raises - it returns the problems so callers can decide
     severity.
 
     Each returned string is prefixed with a dotted path so the source of the
@@ -451,7 +451,7 @@ def _validate_resolver_consistency(profile: dict, kind: Optional[str]) -> list[s
         if rtype == ResolverType.PLACEHOLDER.value:
             layout = resolver.get("layout")
             # Only enforce when the surface actually declares layouts (else we
-            # cannot prove absence — that is the shell-backed check's job).
+            # cannot prove absence - that is the shell-backed check's job).
             if layout is not None and layouts and layout not in layouts:
                 problems.append(
                     f"roles.{rid}.resolver.layout: {layout!r} not in surface.{kind}.layouts "

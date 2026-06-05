@@ -5,10 +5,10 @@ Two invariants, both scoped to *git-tracked* files (so gitignored scratch such a
 ``brand-kit/`` and ``generated/`` is ignored):
 
 1. No Office binary (``.docx``/``.pptx``/``.xlsx``/legacy) is tracked anywhere
-   except ``tests/fixtures/`` — company templates and generated samples must never
+   except ``tests/fixtures/`` - company templates and generated samples must never
    be committed, regardless of filename.
 2. No tracked source imports Bedrock/boto3 or a vendored proprietary Office helper
-   package (``office.*``) — the engine is self-contained.
+   package (``office.*``) - the engine is self-contained.
 """
 from __future__ import annotations
 

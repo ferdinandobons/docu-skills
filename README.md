@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="assets/hero.svg" alt="OfficeSkills — extract a company's Office template into a reusable Brand Profile, then generate unlimited on-brand Word, PowerPoint and Excel documents" width="100%" />
+<img src="assets/hero.svg" alt="OfficeSkills - extract a company's Office template into a reusable Brand Profile, then generate unlimited on-brand Word, PowerPoint and Excel documents" width="100%" />
 
 <br/>
 
-**Learn a company's Office template once. Generate on-brand Word, PowerPoint & Excel documents forever.**
+**Turn one company template into unlimited on-brand Word, PowerPoint and Excel documents.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
@@ -35,20 +35,20 @@
 
 ## What is OfficeSkills?
 
-**OfficeSkills** is an **agent-skill bundle** — for Claude Code, Codex, and compatible AI agents — that turns a company's existing Office template into a **reusable brand memory**, then writes new documents that stay faithful to it.
+**OfficeSkills** is an **agent-skill bundle** - for Claude Code, Codex, and compatible AI agents - that turns a company's existing Office template into a **reusable brand memory**, then writes new documents that stay faithful to it.
 
-You give it one branded `.docx`, `.pptx`, or `.xlsx`. It **extracts** the brand — theme colors and fonts, named styles, the document's *structure*, layouts, cover anchors, logos and tables — into a portable **Brand Profile**. From then on, every document it **generates** is built *from the original template shell* and uses *only* the artifacts the template actually defines.
+You give it one branded `.docx`, `.pptx`, or `.xlsx`. It **extracts** the brand - theme colors and fonts, named styles, the document's *structure*, layouts, cover anchors, logos and tables - into a portable **Brand Profile**. From then on, every document it **generates** is built *from the original template shell* and uses *only* the artifacts the template actually defines.
 
-> **The core guarantee: off-brand output is impossible by construction.** No generator ever writes a literal style name, hex color, or font — those live only in the Brand Profile, and `verify` refuses a profile that points at anything the template doesn't contain. There is no "creative" path that drifts from the brand.
+> **The core guarantee: off-brand output is impossible by construction.** No generator ever writes a literal style name, hex color, or font - those live only in the Brand Profile, and `verify` refuses a profile that points at anything the template doesn't contain. There is no "creative" path that drifts from the brand.
 
 ### Why not just ask an AI to "use this template"?
 
-General-purpose document skills generate *freely* and only loosely imitate a reference file — fonts drift, the palette wanders, the corporate structure is lost. OfficeSkills is the opposite: narrow and faithful. It learns the template as a set of **rules and reusable parts**, remembers them in a `brand-kit/`, and **respects them** across an unlimited number of documents.
+General-purpose document skills generate *freely* and only loosely imitate a reference file - fonts drift, the palette wanders, the corporate structure is lost. OfficeSkills is the opposite: narrow and faithful. It learns the template as a set of **rules and reusable parts**, remembers them in a `brand-kit/`, and **respects them** across an unlimited number of documents.
 
 |  | General-purpose Office skills | **OfficeSkills** |
 |---|---|---|
 | Mental model | "create a nice document" | "fill the company's template" |
-| Brand fidelity | best-effort imitation | **by construction** — opens from the shell, applies only its artifacts |
+| Brand fidelity | best-effort imitation | **by construction** - opens from the shell, applies only its artifacts |
 | Reusability | re-explain the brand every time | **extract once**, reuse forever via `brand-kit/` |
 | Structure | free-form | **respects the template's cover → contents → body order** |
 | Guardrails | none | `verify` fails if a profile references a missing style/layout/range |
@@ -57,13 +57,13 @@ General-purpose document skills generate *freely* and only loosely imitate a ref
 
 ## Highlights
 
-- 🎯 **Brand-faithful by construction** — generation opens from the real template shell and applies only its named styles, theme colors, fonts and layouts. The content model is brand-agnostic; the **Brand Profile** is the single source of brand truth.
-- 🧠 **Extract once, reuse forever** — a portable `brand-kit/<name>/` is the template's memory; every later document reads it. No re-explaining the brand.
-- 🏛️ **Structure-aware** — captures the template's *ordered skeleton* (e.g. **cover → table of contents → body**) and tags each component as a **fixed structure to keep in order** or a **style to use on demand**. ([details](#structure-aware-not-just-style-aware))
-- ✅ **Enforced, not just promised** — `verify` opens the shell and **fails** if a role resolves to a style/layout/named-range that doesn't exist. Deterministic checks also cover allowed styles, palette adherence, residual template text, broken tables and language rules.
-- 🧩 **One shared engine** — a single profile schema, resolver, OOXML layer and QA gate underpin all three formats. The Word vertical is the reference implementation; PowerPoint and Excel build on the same foundation.
-- 🗂️ **Full artifact catalog** — records OOXML parts, styles, media, layouts, formulas and named ranges, so an agent can reason about anything the template exposes — even artifacts it can't yet regenerate.
-- 🔓 **Self-contained & MIT** — pure `python-docx` / `python-pptx` / `openpyxl` + OOXML. No cloud, no external services, no vendor lock-in.
+- 🎯 **Brand-faithful by construction** - generation opens from the real template shell and applies only its named styles, theme colors, fonts and layouts. The content model is brand-agnostic; the **Brand Profile** is the single source of brand truth.
+- 🧠 **Extract once, reuse forever** - a portable `brand-kit/<name>/` is the template's memory; every later document reads it. No re-explaining the brand.
+- 🏛️ **Structure-aware** - captures the template's *ordered skeleton* (e.g. **cover → table of contents → body**) and tags each component as a **fixed structure to keep in order** or a **style to use on demand**. ([details](#structure-aware-not-just-style-aware))
+- ✅ **Enforced, not just promised** - `verify` opens the shell and **fails** if a role resolves to a style/layout/named-range that doesn't exist. Deterministic checks also cover allowed styles, palette adherence, residual template text, broken tables and language rules.
+- 🧩 **One shared engine** - a single profile schema, resolver, OOXML layer and QA gate underpin all three formats. The Word vertical is the reference implementation; PowerPoint and Excel build on the same foundation.
+- 🗂️ **Full artifact catalog** - records OOXML parts, styles, media, layouts, formulas and named ranges, so an agent can reason about anything the template exposes - even artifacts it can't yet regenerate.
+- 🔓 **Self-contained & MIT** - pure `python-docx` / `python-pptx` / `openpyxl` + OOXML. No cloud, no external services, no vendor lock-in.
 
 ---
 
@@ -83,18 +83,18 @@ General-purpose document skills generate *freely* and only loosely imitate a ref
 
 1. **Extract** unpacks the template's OOXML and records its brand: theme, named styles mapped to semantic **roles**, the **document structure** (the ordered skeleton plus which parts are fixed vs free), layouts, cover anchors, logos, and a complete artifact catalog. The original file is kept **byte-for-byte** as the *shell*.
 2. **Generate** turns your content into an **IntermediateDocument** of brand-agnostic typed blocks (heading, paragraph, callout, list, table, …). A **pure resolver** maps each block to the concrete brand artifact from the profile, fills the shell **in the template's structural order**, and saves.
-3. **Verify / QA** runs deterministic checks — every role resolves to a real artifact, only allowed styles are used, the palette holds, no residual template text remains, tables are intact — and, when LibreOffice is available, a visual pass.
+3. **Verify / QA** runs deterministic checks - every role resolves to a real artifact, only allowed styles are used, the palette holds, no residual template text remains, tables are intact - and, when LibreOffice is available, a visual pass.
 
 ---
 
 ## Structure-aware, not just style-aware
 
-Most "use my template" tools copy *styling*. OfficeSkills also learns the template's **document structure** and reproduces it. During extraction it detects the ordered skeleton — typically **cover → table of contents → body** — and annotates every captured component with **how it is used**:
+Most "use my template" tools copy *styling*. OfficeSkills also learns the template's **document structure** and reproduces it. During extraction it detects the ordered skeleton - typically **cover → table of contents → body** - and annotates every captured component with **how it is used**:
 
-- **Structural** parts (cover, table of contents) are kept **in order** in every generated document — the cover is filled in place, the TOC is preserved and refreshed.
+- **Structural** parts (cover, table of contents) are kept **in order** in every generated document - the cover is filled in place, the TOC is preserved and refreshed.
 - **Freeform** parts (headings, callouts, lists, tables, quotes, captions) are styles to **use on demand**, in whatever order your content needs.
 
-So a generated report opens with the company cover, keeps a live table of contents, and fills **only the body** with your content — exactly like a person starting from the corporate template, rather than a bare wall of text.
+So a generated report opens with the company cover, keeps a live table of contents, and fills **only the body** with your content - exactly like a person starting from the corporate template, rather than a bare wall of text.
 
 ---
 
@@ -102,7 +102,7 @@ So a generated report opens with the company cover, keeps a live table of conten
 
 | Skill | Format | Generates |
 |---|---|---|
-| **`brand-docx`** | Word `.docx` | reports, letters, memos: cover, headings, paragraphs, callouts, quotes, captions, lists, tables — in the template's structural order |
+| **`brand-docx`** | Word `.docx` | reports, letters, memos: cover, headings, paragraphs, callouts, quotes, captions, lists, tables - in the template's structural order |
 | **`brand-pptx`** | PowerPoint `.pptx` | decks: title / section / content slides from the template's real masters & layouts, with long-text splitting |
 | **`brand-xlsx`** | Excel `.xlsx` | workbooks: fills named cells & regions while **preserving formulas** and workbook structure |
 
@@ -122,7 +122,7 @@ brand-kit/<name>/
 └─ provenance.sha256     # source hash for drift detection
 ```
 
-`brand-kit/` lives either in your **project** (`./brand-kit/`, versionable, wins) or **globally** (`~/.claude/brand-kit/`, reusable across projects). It is the template's portable memory — copy the folder and the brand travels with it.
+`brand-kit/` lives either in your **project** (`./brand-kit/`, versionable, wins) or **globally** (`~/.claude/brand-kit/`, reusable across projects). It is the template's portable memory - copy the folder and the brand travels with it.
 
 ---
 
@@ -140,12 +140,12 @@ python3 -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activ
 pip install -r requirements.txt
 ```
 
-### Optional (visual QA — render-based checks)
+### Optional (visual QA - render-based checks)
 
 Needed only for the **visual** verification pass; their absence degrades gracefully and never blocks extraction, generation, or deterministic QA.
 
-- **LibreOffice** (`soffice`) — headless render to PDF
-- **Poppler** (`pdftoppm`) — PDF → PNG
+- **LibreOffice** (`soffice`) - headless render to PDF
+- **Poppler** (`pdftoppm`) - PDF → PNG
 
 ```bash
 # macOS (Homebrew)
@@ -164,7 +164,7 @@ Check what's available at any time:
 python scripts/brandkit/cli.py doctor
 ```
 
-`doctor` lists each dependency (present or missing) and prints the exact install command for anything missing — it never fails the run.
+`doctor` lists each dependency (present or missing) and prints the exact install command for anything missing - it never fails the run.
 
 ### Install as an agent skill
 
@@ -198,7 +198,7 @@ Just describe what you want and attach a template:
 
 The agent activates `brand-docx`, extracts a Brand Profile from the template (or reuses an existing one), turns your request into the template's structure, generates the `.docx` from the original shell, runs QA, and returns the file.
 
-### Direct CLI (the engine — for tests & debugging)
+### Direct CLI (the engine - for tests & debugging)
 
 ```bash
 # 1) Extract the brand from a template into a reusable kit
@@ -211,7 +211,7 @@ python scripts/brandkit/cli.py verify --name acme --scope auto --qa auto
 python scripts/brandkit/cli.py generate --name acme --input idoc.json --output out.docx --scope auto --qa auto
 ```
 
-The content you pass in (`idoc.json`) is an **IntermediateDocument** — brand-agnostic typed blocks. Notice there is **no style, color or font anywhere**: the profile resolves all of that.
+The content you pass in (`idoc.json`) is an **IntermediateDocument** - brand-agnostic typed blocks. Notice there is **no style, color or font anywhere**: the profile resolves all of that.
 
 ```json
 {
@@ -237,12 +237,12 @@ PowerPoint uses the same `IntermediateDocument`; Excel uses a `GridDocument` (na
 | Area | Status |
 |---|---|
 | Shared engine (profile schema, resolver, OOXML, CLI, dual store) | ✅ working |
-| `brand-docx` — extract → verify → generate | ✅ working |
+| `brand-docx` - extract → verify → generate | ✅ working |
 | Document **structure** extraction & order-aware generation | ✅ working |
 | Brand-guarantee enforcement (`verify` fails on missing artifacts) | ✅ working |
 | Deterministic QA (L0: styles, palette, residual text, tables, language) | ✅ working |
-| `brand-pptx` — roles from real layouts, basic generation | 🚧 early |
-| `brand-xlsx` — named-region fills, formula-preserving | 🚧 early |
+| `brand-pptx` - roles from real layouts, basic generation | 🚧 early |
+| `brand-xlsx` - named-region fills, formula-preserving | 🚧 early |
 | Visual QA (LibreOffice render + auto-repair loop) | 🔭 planned |
 | Charts / SmartArt / multi-page section templates | 🔭 catalogued, regeneration staged |
 

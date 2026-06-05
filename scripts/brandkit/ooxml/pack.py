@@ -3,14 +3,14 @@
 
 An OOXML file (``.docx`` / ``.pptx`` / ``.xlsx``) is a ZIP whose entries are XML
 and media "parts". This module is the engine's self-contained replacement for
-the Anthropic ``office/unpack.py`` + ``office/pack.py`` scripts — re-implemented,
+the Anthropic ``office/unpack.py`` + ``office/pack.py`` scripts - re-implemented,
 not vendored. It does four things and nothing else:
 
-- :func:`unpack` — explode a package into a directory tree.
-- :func:`pack` — repack a directory tree into a valid OOXML file, preserving the
+- :func:`unpack` - explode a package into a directory tree.
+- :func:`pack` - repack a directory tree into a valid OOXML file, preserving the
   ZIP entry ordering and the ``[Content_Types].xml`` / ``mimetype`` conventions.
-- :func:`read_part` — read one part's raw bytes without a full unpack.
-- :func:`list_parts` — list the part names in a package.
+- :func:`read_part` - read one part's raw bytes without a full unpack.
+- :func:`list_parts` - list the part names in a package.
 
 Plus small ``lxml`` conveniences (:func:`parse_xml_bytes`, :func:`serialize_xml`)
 and namespace helpers so the rest of the engine never re-imports raw lxml glue.
@@ -18,7 +18,7 @@ and namespace helpers so the rest of the engine never re-imports raw lxml glue.
 **Determinism.** :func:`pack` writes entries in a stable order (``[Content_Types]
 .xml`` first, then ``_rels/.rels``, then the remaining parts sorted) and zeroes
 the per-entry timestamp, so packing the same tree twice yields a byte-identical
-archive — a hard requirement for the "generate() twice is byte-identical" rule.
+archive - a hard requirement for the "generate() twice is byte-identical" rule.
 The shell, however, is copied **verbatim** elsewhere (never round-tripped) to
 preserve themes/numbering/fonts exactly; this module is for parts we deliberately
 rewrite.

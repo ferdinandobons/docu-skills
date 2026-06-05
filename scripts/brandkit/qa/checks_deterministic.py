@@ -29,7 +29,7 @@ def check_resolver_targets(shell, profile: dict) -> list[Finding]:
 
     This is the deterministic backstop for the core promise ("apply only artifacts
     the profile *proved* exist"): it opens the shell once and confirms each role's
-    concrete target is present —
+    concrete target is present -
       - docx: ``style_id`` or ``style_name`` ∈ ``doc.styles``;
       - pptx: ``layout`` ∈ the presentation's slide-layout names;
       - xlsx: ``name`` ∈ the workbook's defined names.

@@ -30,7 +30,7 @@ def run_qa(
         profile: the brand profile under test.
         shell: the brand shell (``template/shell.<ext>``). When given, the
             ``resolver_targets_exist`` invariant opens it and verifies every role's
-            target actually exists — the deterministic backstop for the core
+            target actually exists - the deterministic backstop for the core
             promise. Passed at verify time so the shell is checked even without a
             generated output.
         extra_findings: findings recorded elsewhere (e.g. by the generator's loud

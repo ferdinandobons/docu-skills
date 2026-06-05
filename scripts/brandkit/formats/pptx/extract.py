@@ -74,7 +74,7 @@ def _classify_layouts(prs: Presentation) -> list[dict]:
     Returns a list (in deck order) of ``{name, idx, title_idx, subtitle_idx,
     body_idx}`` where each ``*_idx`` is the placeholder ``idx`` of the first slot
     of that family present in the layout, or ``None``. This is the only source of
-    truth for role derivation — nothing here is fabricated.
+    truth for role derivation - nothing here is fabricated.
     """
     described: list[dict] = []
     for pos, layout in enumerate(prs.slide_layouts):

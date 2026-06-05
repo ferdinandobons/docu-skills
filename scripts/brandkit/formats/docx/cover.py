@@ -5,9 +5,9 @@ Real company covers seldom expose their title as a plain paragraph: the title
 usually lives in a block-level ``w:sdt`` (a content control, with an ``alias`` /
 ``dataBinding`` / ``docPartGallery`` / placeholder prompt). python-docx's
 ``doc.paragraphs`` cannot see block-level SDTs, so discovery and composition both
-work on the lxml tree here. The cover title is filled IN PLACE — only the inner
+work on the lxml tree here. The cover title is filled IN PLACE - only the inner
 placeholder run's text is overwritten so the run-level formatting (``w:rPr``) the
-brand defined survives — and a brand-new title paragraph is appended only when the
+brand defined survives - and a brand-new title paragraph is appended only when the
 shell genuinely has no cover region (and then it is inserted before the first
 toc/body child so it lands on the cover, never after the TOC).
 """
@@ -53,7 +53,7 @@ def _sdt_is_title(sdt) -> bool:
     what title-like words its rendered entries contain. A TOC SDT
     (``docPartGallery='Table of Contents'`` or an inner ``w:instrText`` ``TOC``
     field) is excluded up front so the weak inner-text token match below can never
-    misclassify the TOC as the title — which would dump the user's title into the
+    misclassify the TOC as the title - which would dump the user's title into the
     TOC content control and blank every TOC entry. The author's own title slot
     (an ``alias``/``dataBinding`` SDT) still matches via the strong checks.
     """
@@ -159,11 +159,11 @@ def compose_cover(doc, cover: Cover | None, profile: dict, *, findings: Optional
     """Fill the PRESERVED cover title anchor in place.
 
     Resolution order:
-      1. a block-level ``w:sdt`` cover title (the real-template case) — fill the
+      1. a block-level ``w:sdt`` cover title (the real-template case) - fill the
          inner run in place, preserving run formatting;
-      2. a ``{{title}}`` / "Insert title" placeholder paragraph — overwrite only
+      2. a ``{{title}}`` / "Insert title" placeholder paragraph - overwrite only
          that run's text (never ``para.text =``, which would destroy run rPr);
-      3. no cover anchor at all — append a title paragraph, inserted BEFORE the
+      3. no cover anchor at all - append a title paragraph, inserted BEFORE the
          first toc/body child so it lands on the cover, and record a degraded
          finding. The title must NEVER land after the TOC.
     """
@@ -180,7 +180,7 @@ def compose_cover(doc, cover: Cover | None, profile: dict, *, findings: Optional
             _apply_role_style_sdt(doc, sdt, profile, "cover.title")
             return
 
-    # 2) Placeholder paragraph — overwrite only the matching run's text in place.
+    # 2) Placeholder paragraph - overwrite only the matching run's text in place.
     for para in doc.paragraphs[:8]:
         if PLACEHOLDER_TITLE in para.text or "Insert title" in para.text:
             _fill_paragraph_in_place(para, title)

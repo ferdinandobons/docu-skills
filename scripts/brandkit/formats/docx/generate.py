@@ -53,8 +53,8 @@ def generate(
 
     # Order-aware body replacement: remove ONLY the freeform body region, keeping
     # the ordered cover and TOC regions (and the final sectPr) in place. New
-    # content is appended into the now-empty body region — immediately before the
-    # sectPr — which is exactly the right slot.
+    # content is appended into the now-empty body region - immediately before the
+    # sectPr - which is exactly the right slot.
     struct = profile.get("structure")
     structure.clear_body_region(doc, struct, preserve_cover=True, preserve_toc=True)
 
@@ -66,7 +66,7 @@ def generate(
     for block in idoc.blocks:
         _write_block(doc, profile, resolver, block, sink)
 
-    # Refresh the preserved TOC (if any) so Word recomputes it on open — the new
+    # Refresh the preserved TOC (if any) so Word recomputes it on open - the new
     # headings written into the body will be picked up. No-op when there is no TOC.
     structure.refresh_toc(doc)
 
@@ -105,8 +105,8 @@ def _write_block(doc, profile: dict, resolver: ProfileResolver, block: ir.Block,
     elif isinstance(block, ir.PageBreak):
         doc.add_page_break()
     elif block.TYPE in _UNHANDLED_BLOCK_TYPES:
-        # No writer for this block in the M1 docx vertical. Skip cleanly — NEVER
-        # emit a blank ``Normal`` paragraph — and record a degradation finding so
+        # No writer for this block in the M1 docx vertical. Skip cleanly - NEVER
+        # emit a blank ``Normal`` paragraph - and record a degradation finding so
         # the dropped content is visible in QA instead of silently lost.
         sev = schema.Severity.INFO.value if block.TYPE == "toc" else schema.Severity.WARNING.value
         findings.append(

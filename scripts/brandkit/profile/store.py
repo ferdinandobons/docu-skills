@@ -5,7 +5,7 @@ A Brand Profile is a self-contained, copyable directory ``brand-kit/<name>/``
 (see §3.1). It can live in two places:
 
 - **project store**: ``./brand-kit/<name>`` (relative to the current working
-  directory). **Project wins** — a project profile shadows a global one of the
+  directory). **Project wins** - a project profile shadows a global one of the
   same name.
 - **global store**: ``~/.claude/brand-kit/<name>``.
 
@@ -13,7 +13,7 @@ This module is the only code that knows those two paths. It also owns the
 ``provenance.sha256`` drift/tamper detection on the shell: the saved profile
 records the shell's SHA-256, and :func:`load_profile` re-hashes the on-disk
 shell and reports a mismatch (a hand-edited / corrupted shell) without refusing
-to load — the caller decides what to do with the warning.
+to load - the caller decides what to do with the warning.
 
 On-disk layout written by :func:`save_profile` (subset present depends on what
 the extractor produced)::
@@ -195,7 +195,7 @@ def resolve_profile_dir(
 
     Args:
         name: the profile name (directory name under a store).
-        scope: ``"auto"`` (project first, then global — **project wins**),
+        scope: ``"auto"`` (project first, then global - **project wins**),
             ``"project"`` (only the project store), or ``"global"`` (only the
             global store).
         cwd: override the working directory used for the project store.
@@ -275,7 +275,7 @@ def save_profile(
         directory: the ``brand-kit/<name>`` dir to write (created if absent).
         profile: the ``profile.json`` dict. Its ``provenance.shell.sha256`` is
             (re)stamped here from ``shell_bytes`` so the recorded hash always
-            matches what is written — callers need not pre-compute it.
+            matches what is written - callers need not pre-compute it.
         shell_bytes: the byte-for-byte template shell to write at
             ``template/shell.<ext>`` (ext from ``profile["kind"]``).
         assets: optional ``{relative_path: bytes}`` to write under the profile
@@ -362,7 +362,7 @@ def load_profile(
 
     Reads ``profile.json``, re-hashes the on-disk shell, compares it to the
     recorded ``provenance.shell.sha256``, and runs :func:`schema.validate`.
-    Never raises on drift or validation problems — those are returned on the
+    Never raises on drift or validation problems - those are returned on the
     :class:`LoadedProfile` so the caller (verify/generate) decides severity.
 
     Args:

@@ -1,4 +1,4 @@
-<svg width="1280" height="420" viewBox="0 0 1280 420" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="OfficeSkills — extract a company's Office template into a reusable Brand Profile, then generate unlimited on-brand Word, PowerPoint and Excel documents">
+<svg width="2560" height="840" viewBox="0 0 1280 420" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="OfficeSkills: extract a company's Office template into a reusable Brand Profile, then generate unlimited on-brand Word, PowerPoint and Excel documents">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="420" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#0B1022"/>
@@ -29,8 +29,7 @@
   <rect width="1280" height="420" rx="20" fill="url(#dots)"/>
   <rect x="0.5" y="0.5" width="1279" height="419" rx="20" fill="none" stroke="#FFFFFF" stroke-opacity="0.06"/>
 
-  <!-- ============ TOP BAND: wordmark + tagline ============ -->
-  <!-- Office 2x2 tile mark -->
+  <!-- TOP BAND: wordmark + tagline -->
   <g>
     <rect x="44" y="40" width="16" height="16" rx="3.5" fill="#2B7CD3"/>
     <rect x="63" y="40" width="16" height="16" rx="3.5" fill="#E0742B"/>
@@ -40,14 +39,11 @@
   <text x="96" y="69" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, sans-serif" font-size="33" font-weight="800" letter-spacing="-0.5" fill="#FFFFFF">Office<tspan fill="#6EA8FE">Skills</tspan></text>
 
   <text x="1234" y="50" text-anchor="end" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14.5" font-weight="600" fill="#C9D8F5">Your company's Office template, learned once.</text>
-  <text x="1234" y="73" text-anchor="end" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14.5" font-weight="500" fill="#9DB4E8">Unlimited on-brand Word, PowerPoint &amp; Excel — forever.</text>
+  <text x="1234" y="73" text-anchor="end" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14.5" font-weight="500" fill="#9DB4E8">Unlimited on-brand Word, PowerPoint &amp; Excel, forever.</text>
 
   <line x1="44" y1="104" x2="1236" y2="104" stroke="#FFFFFF" stroke-opacity="0.07"/>
 
-  <!-- ============ PIPELINE ============ -->
-  <!-- pipeline baseline ~ y=262 -->
-
-  <!--  STAGE A: company template  -->
+  <!-- STAGE A: company template -->
   <g filter="url(#soft)">
     <rect x="64" y="170" width="196" height="176" rx="12" fill="#161F3D" stroke="#2C3A66" stroke-width="1.5"/>
     <rect x="64" y="170" width="196" height="30" rx="12" fill="#1E2A50"/>
@@ -67,17 +63,16 @@
   </g>
   <text x="162" y="370" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12.5" fill="#9DB4E8">your company template</text>
 
-  <!--  ARROW A -> B  (step 1: EXTRACT)  -->
+  <!-- STEP 1: EXTRACT  (straight arrow A to B) -->
   <line x1="266" y1="262" x2="392" y2="262" stroke="#3C4E84" stroke-width="2.5" stroke-dasharray="2 7" stroke-linecap="round" marker-end="url(#arrow)"/>
   <circle cx="306" cy="224" r="11" fill="url(#accent)"/>
   <text x="306" y="228" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="800" fill="#0B1022">1</text>
   <text x="324" y="228" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#9DC0FF">EXTRACT</text>
   <text x="329" y="296" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11.5" fill="#7E96CC">learn the brand</text>
 
-  <!--  STAGE B: Brand Profile (brand-kit)  -->
+  <!-- STAGE B: Brand Profile (brand-kit) -->
   <g filter="url(#soft)">
     <rect x="398" y="166" width="356" height="192" rx="14" fill="#16213F" stroke="url(#accent)" stroke-width="1.6"/>
-    <!-- save/disk icon -->
     <g transform="translate(420,184)">
       <rect x="0" y="0" width="22" height="22" rx="4" fill="#0E1730" stroke="#6EA8FE" stroke-width="1.5"/>
       <rect x="5" y="0" width="12" height="7" rx="1" fill="#6EA8FE"/>
@@ -86,10 +81,9 @@
     <text x="452" y="194" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15.5" font-weight="700" fill="#EAF1FF">Brand Profile</text>
     <text x="452" y="212" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#8FA6D8">brand-kit/ · saved once, reused freely</text>
     <line x1="416" y1="226" x2="736" y2="226" stroke="#2C3A66"/>
-    <!-- captured items, two columns -->
     <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" fill="#C9D8F5">
       <circle cx="424" cy="248" r="2.6" fill="#6EA8FE"/><text x="434" y="252">colors &amp; fonts</text>
-      <circle cx="424" cy="274" r="2.6" fill="#6EA8FE"/><text x="434" y="278">named styles -> roles</text>
+      <circle cx="424" cy="274" r="2.6" fill="#6EA8FE"/><text x="434" y="278">named styles -&gt; roles</text>
       <circle cx="424" cy="300" r="2.6" fill="#6EA8FE"/><text x="434" y="304">ordered structure</text>
       <circle cx="424" cy="326" r="2.6" fill="#6EA8FE"/><text x="434" y="330">layouts</text>
       <circle cx="586" cy="248" r="2.6" fill="#6EA8FE"/><text x="596" y="252">cover anchors</text>
@@ -100,48 +94,49 @@
   </g>
   <text x="576" y="382" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11.5" fill="#7E96CC">the brand, captured as reusable rules + the original shell</text>
 
-  <!--  ARROW B -> C  (step 2: GENERATE)  -->
-  <line x1="760" y1="262" x2="858" y2="262" stroke="#3C4E84" stroke-width="2.5" stroke-dasharray="2 7" stroke-linecap="round"/>
-  <path d="M858 262 C 882 262, 884 196, 910 196" stroke="#3C4E84" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrow)"/>
-  <path d="M858 262 H 906" stroke="#3C4E84" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrow)"/>
-  <path d="M858 262 C 882 262, 884 328, 910 328" stroke="#3C4E84" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrow)"/>
-  <circle cx="788" cy="224" r="11" fill="url(#accent)"/>
-  <text x="788" y="228" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="800" fill="#0B1022">2</text>
-  <text x="806" y="228" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#9DC0FF">GENERATE</text>
-  <text x="809" y="296" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11.5" fill="#7E96CC">fill the shell · QA pass</text>
+  <!-- STEP 2: GENERATE  (straight arrow B to hub, then fan to outputs) -->
+  <line x1="760" y1="262" x2="892" y2="262" stroke="#3C4E84" stroke-width="2.5" stroke-dasharray="2 7" stroke-linecap="round"/>
+  <circle cx="897" cy="262" r="3.5" fill="#6EA8FE"/>
+  <path d="M900 262 C 926 262, 930 200, 966 200" stroke="#3C4E84" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M900 262 H 966" stroke="#3C4E84" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M900 262 C 926 262, 930 324, 966 324" stroke="#3C4E84" stroke-width="2.5" fill="none" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <circle cx="780" cy="224" r="11" fill="url(#accent)"/>
+  <text x="780" y="228" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="800" fill="#0B1022">2</text>
+  <text x="798" y="228" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#9DC0FF">GENERATE</text>
+  <text x="818" y="296" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11.5" fill="#7E96CC">fill the shell · QA pass</text>
 
-  <!--  STAGE C: on-brand outputs  -->
+  <!-- STAGE C: on-brand outputs -->
   <!-- Word -->
   <g filter="url(#soft)">
-    <rect x="912" y="172" width="232" height="48" rx="11" fill="#16203E" stroke="#2C3A66" stroke-width="1.4"/>
-    <rect x="912" y="172" width="6" height="48" rx="3" fill="#2B7CD3"/>
-    <rect x="932" y="184" width="24" height="24" rx="5" fill="#102742" stroke="#2B7CD3" stroke-width="1.3"/>
-    <text x="944" y="201" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800" fill="#7FB6F2">W</text>
-    <text x="970" y="192" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#EAF1FF">Word</text>
-    <text x="970" y="210" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#7E96CC">.docx</text>
+    <rect x="972" y="176" width="258" height="48" rx="11" fill="#16203E" stroke="#2C3A66" stroke-width="1.4"/>
+    <rect x="972" y="176" width="6" height="48" rx="3" fill="#2B7CD3"/>
+    <rect x="992" y="188" width="24" height="24" rx="5" fill="#102742" stroke="#2B7CD3" stroke-width="1.3"/>
+    <text x="1004" y="205" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800" fill="#7FB6F2">W</text>
+    <text x="1030" y="196" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#EAF1FF">Word</text>
+    <text x="1030" y="214" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#7E96CC">.docx</text>
   </g>
   <!-- PowerPoint -->
   <g filter="url(#soft)">
-    <rect x="912" y="234" width="232" height="48" rx="11" fill="#16203E" stroke="#2C3A66" stroke-width="1.4"/>
-    <rect x="912" y="234" width="6" height="48" rx="3" fill="#E0742B"/>
-    <rect x="932" y="246" width="24" height="24" rx="5" fill="#33240F" stroke="#E0742B" stroke-width="1.3"/>
-    <text x="944" y="263" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800" fill="#F2A368">P</text>
-    <text x="970" y="254" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#EAF1FF">PowerPoint</text>
-    <text x="970" y="272" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#7E96CC">.pptx</text>
+    <rect x="972" y="238" width="258" height="48" rx="11" fill="#16203E" stroke="#2C3A66" stroke-width="1.4"/>
+    <rect x="972" y="238" width="6" height="48" rx="3" fill="#E0742B"/>
+    <rect x="992" y="250" width="24" height="24" rx="5" fill="#33240F" stroke="#E0742B" stroke-width="1.3"/>
+    <text x="1004" y="267" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800" fill="#F2A368">P</text>
+    <text x="1030" y="258" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#EAF1FF">PowerPoint</text>
+    <text x="1030" y="276" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#7E96CC">.pptx</text>
   </g>
   <!-- Excel -->
   <g filter="url(#soft)">
-    <rect x="912" y="296" width="232" height="48" rx="11" fill="#16203E" stroke="#2C3A66" stroke-width="1.4"/>
-    <rect x="912" y="296" width="6" height="48" rx="3" fill="#2BA45F"/>
-    <rect x="932" y="308" width="24" height="24" rx="5" fill="#0F2A1C" stroke="#2BA45F" stroke-width="1.3"/>
-    <text x="944" y="325" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800" fill="#6FD79E">X</text>
-    <text x="970" y="316" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#EAF1FF">Excel</text>
-    <text x="970" y="334" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#7E96CC">.xlsx</text>
+    <rect x="972" y="300" width="258" height="48" rx="11" fill="#16203E" stroke="#2C3A66" stroke-width="1.4"/>
+    <rect x="972" y="300" width="6" height="48" rx="3" fill="#2BA45F"/>
+    <rect x="992" y="312" width="24" height="24" rx="5" fill="#0F2A1C" stroke="#2BA45F" stroke-width="1.3"/>
+    <text x="1004" y="329" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="800" fill="#6FD79E">X</text>
+    <text x="1030" y="320" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#EAF1FF">Excel</text>
+    <text x="1030" y="338" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#7E96CC">.xlsx</text>
   </g>
-  <text x="1028" y="372" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11.5" fill="#7E96CC">one profile -> unlimited on-brand documents</text>
+  <text x="1101" y="372" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11.5" fill="#7E96CC">one profile -&gt; unlimited on-brand documents</text>
 
   <!-- footer chips: the three verbs -->
-  <g transform="translate(44,392)" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#9DB4E8">
+  <g transform="translate(64,394)" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#9DB4E8">
     <rect x="0" y="-13" width="78" height="22" rx="11" fill="#16213F" stroke="#2C3A66"/><text x="13" y="2">extract</text>
     <rect x="86" y="-13" width="70" height="22" rx="11" fill="#16213F" stroke="#2C3A66"/><text x="100" y="2">verify</text>
     <rect x="164" y="-13" width="84" height="22" rx="11" fill="#16213F" stroke="#2C3A66"/><text x="178" y="2">generate</text>

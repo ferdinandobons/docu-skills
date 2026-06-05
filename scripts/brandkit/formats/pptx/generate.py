@@ -6,7 +6,7 @@ Design (off-brand-by-construction, §C3/M6/M7):
 - We open FROM the template shell (``shell_path``) and only ever add slides built
   on layouts the *profile proved exist*. The cover and content layouts are read
   from the profile's real ``roles`` (``cover.title`` / ``heading.1`` /
-  ``paragraph``), which the extractor derived from the parsed deck — never a
+  ``paragraph``), which the extractor derived from the parsed deck - never a
   hardcoded ``"Title Slide"``/``"Title and Content"`` literal. If the profile has
   no usable layout for a role (status ``stub`` / ``layout: null``) we fall back to
   a real layout already present in the shell, never to a fabricated name.
@@ -73,8 +73,8 @@ def generate(profile: dict, shell_path: str | Path, idoc: ir.IntermediateDocumen
 def _layout_for_role(prs: Presentation, profile: dict, role_id: str):
     """Return the real shell layout the profile assigns to ``role_id``.
 
-    Reads ``profile['roles'][role_id]['resolver']['layout']`` — a name the
-    extractor proved exists in this deck — and looks it up by name. Returns
+    Reads ``profile['roles'][role_id]['resolver']['layout']`` - a name the
+    extractor proved exists in this deck - and looks it up by name. Returns
     ``None`` when the role is a stub (no layout) or the named layout is absent
     from the shell (so callers fall back to a real layout, never a fiction).
     """
@@ -149,7 +149,7 @@ def _body_lines(blocks: list[ir.Block]) -> list[str]:
             if block.attribution:
                 attribution = textutil.runs_to_text(block.attribution)
                 if attribution:
-                    quote = f"{quote} — {attribution}" if quote else attribution
+                    quote = f"{quote} - {attribution}" if quote else attribution
             _append(lines, quote)
         elif isinstance(block, ir.Caption):
             _append(lines, textutil.runs_to_text(block.runs))

@@ -6,8 +6,8 @@ title placeholder, detects demo instruction text, and infers the core DOCX roles
 
 ## Ordered document structure (schema 1.1.0+)
 
-Extraction also detects the template's **ordered top-level skeleton** — the
-sequence of regions a generated document of this brand must respect — and records
+Extraction also detects the template's **ordered top-level skeleton** - the
+sequence of regions a generated document of this brand must respect - and records
 it in `profile.structure`:
 
 ```jsonc
@@ -33,10 +33,10 @@ Detection runs on the lxml body element (`doc.element.body`), never on
 python-docx paragraph indices, because the cover title and the TOC commonly live
 inside block-level `w:sdt` elements that python-docx does not expose.
 
-- **Cover region** — body-level content *before* the first TOC region or first
+- **Cover region** - body-level content *before* the first TOC region or first
   Heading-1 paragraph. Cover anchors (SDTs / placeholders / logos) come from
   `cover.discover_cover()`.
-- **TOC region** — any of:
+- **TOC region** - any of:
   - a block-level `w:sdt` whose `w:docPartGallery/@w:val` is `Table of Contents`,
   - a paragraph using a TOC / TOCHeading style (style id/name contains
     `toc`/`sommario`/`indice`/`inhalt`/`contenido`),
@@ -44,7 +44,7 @@ inside block-level `w:sdt` elements that python-docx does not expose.
   - a heading whose text is a known contents word in EN/IT/FR/DE/ES
     (`Contents`, `Sommario`, `Indice`, `Inhalt`, `Table des matières`, `Índice`,
     `Contenido`, …).
-- **Body region** — everything after the TOC (or after the cover when there is no
+- **Body region** - everything after the TOC (or after the cover when there is no
   TOC) up to the final body-level `w:sectPr`.
 
 The detector is brand-agnostic by design: instead of hardcoding one template's

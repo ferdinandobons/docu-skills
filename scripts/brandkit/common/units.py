@@ -40,7 +40,7 @@ PT_PER_INCH: int = 72
 HALF_POINTS_PER_PT: int = 2
 
 # ---------------------------------------------------------------------------
-# Common page sizes in EMU (width, height) — portrait orientation.
+# Common page sizes in EMU (width, height) - portrait orientation.
 # ---------------------------------------------------------------------------
 PAGE_SIZE_A4_EMU: tuple[int, int] = (7560000, 10692000)        # 210 x 297 mm
 PAGE_SIZE_LETTER_EMU: tuple[int, int] = (7772400, 10058400)    # 8.5 x 11 in

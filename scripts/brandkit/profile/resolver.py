@@ -72,7 +72,7 @@ class ProfileResolver:
         The list family (bullet/number) comes from the block; the *level* comes
         from the item (``item.level`` is 0-based, role ids are 1-based, so
         ``level+1``). When no per-level role exists in the profile the resolver
-        falls back to the level-1 list role, then to ``paragraph`` — so a deeply
+        falls back to the level-1 list role, then to ``paragraph`` - so a deeply
         nested item still gets a list style rather than being dropped.
         """
         family = "number" if block.ordered else "bullet"

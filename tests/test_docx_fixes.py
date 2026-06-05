@@ -53,7 +53,7 @@ def _add_toc_field(doc, instr='TOC \\o "1-3" \\h \\z \\u'):
     it = OxmlElement("w:instrText"); it.text = instr; r2._r.append(it)
     r3 = p.add_run()
     fs = OxmlElement("w:fldChar"); fs.set(qn("w:fldCharType"), "separate"); r3._r.append(fs)
-    # a nested PAGEREF field inside the TOC entry — must NOT be marked dirty
+    # a nested PAGEREF field inside the TOC entry - must NOT be marked dirty
     rp = p.add_run()
     pb = OxmlElement("w:fldChar"); pb.set(qn("w:fldCharType"), "begin"); rp._r.append(pb)
     rp2 = p.add_run()
@@ -83,7 +83,7 @@ def _docx_profile(roles=None):
 
 
 # ---------------------------------------------------------------------------
-# C1 — TOC over-capture
+# C1 - TOC over-capture
 # ---------------------------------------------------------------------------
 class TocOverCaptureTest(unittest.TestCase):
     def test_post_body_contents_heading_is_body_and_cleared(self):
@@ -143,7 +143,7 @@ class TocOverCaptureTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# M5 — multi-section sectPr preserved
+# M5 - multi-section sectPr preserved
 # ---------------------------------------------------------------------------
 class SectPrPreservationTest(unittest.TestCase):
     def _count_sect(self, doc):
@@ -205,7 +205,7 @@ class RefreshTocTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# C2 — resolver_targets_exist
+# C2 - resolver_targets_exist
 # ---------------------------------------------------------------------------
 class ResolverTargetsExistTest(unittest.TestCase):
     def _shell(self, tmp_path):
@@ -263,7 +263,7 @@ class ResolverTargetsExistTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# M8 / M12 — literal markdown is an ERROR + run_qa failed
+# M8 / M12 - literal markdown is an ERROR + run_qa failed
 # ---------------------------------------------------------------------------
 class LiteralMarkdownGateTest(unittest.TestCase):
     def test_literal_markdown_doc_fails(self):
@@ -290,7 +290,7 @@ class LiteralMarkdownGateTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# M1 — unhandled blocks
+# M1 - unhandled blocks
 # ---------------------------------------------------------------------------
 class UnhandledBlockTest(unittest.TestCase):
     def _shell(self, tmp_path):
@@ -358,7 +358,7 @@ class UnhandledBlockTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# M2 — nested lists
+# M2 - nested lists
 # ---------------------------------------------------------------------------
 class NestedListTest(unittest.TestCase):
     def _shell(self, tmp_path):
@@ -409,7 +409,7 @@ class NestedListTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# M4 — table spans
+# M4 - table spans
 # ---------------------------------------------------------------------------
 class TableSpanTest(unittest.TestCase):
     def test_colspan_honored(self):
@@ -437,7 +437,7 @@ class TableSpanTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# M3 — cover SDT
+# M3 - cover SDT
 # ---------------------------------------------------------------------------
 class CoverSdtTest(unittest.TestCase):
     def _shell_with_sdt_cover(self, tmp_path):
@@ -525,7 +525,7 @@ class CoverSdtTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# arch-3 — intra-profile consistency (no shell I/O)
+# arch-3 - intra-profile consistency (no shell I/O)
 # ---------------------------------------------------------------------------
 class IntraProfileConsistencyTest(unittest.TestCase):
     def test_fabricated_pptx_layout_is_caught(self):
@@ -562,7 +562,7 @@ class IntraProfileConsistencyTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# arch-5 — component/section expansion
+# arch-5 - component/section expansion
 # ---------------------------------------------------------------------------
 class ComponentExpansionTest(unittest.TestCase):
     def test_undefined_component_is_rejected(self):

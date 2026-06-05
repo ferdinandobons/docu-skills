@@ -8,7 +8,7 @@ It does three jobs:
    resolving ``a:sysClr`` (which carries a ``lastClr`` cached value) to a plain
    hex. (See :func:`parse_theme_colors`.)
 2. **Transform** a base hex through the DrawingML modifiers that the rest of the
-   pipeline carries on color references — ``lumMod``/``lumOff`` (luminance
+   pipeline carries on color references - ``lumMod``/``lumOff`` (luminance
    modulation, the modern Office tint/shade), ``tint``/``shade`` (legacy linear
    blends toward white/black), and ``alpha`` (recorded, not blended). (See
    :func:`apply_transforms`.)
@@ -16,14 +16,14 @@ It does three jobs:
    contrast ratio. (See :func:`contrast_ratio`.)
 
 All hex values exchanged across this module are **6-digit uppercase RRGGBB with
-no leading '#'** — the normal form produced by :func:`normalize_hex`. Inputs may
+no leading '#'** - the normal form produced by :func:`normalize_hex`. Inputs may
 be ``#rgb`` / ``#rrggbb`` / ``rrggbb`` / ``RRGGBB`` and are normalized.
 
 The 12 theme slots, in OOXML document order, are:
 
     dk1 lt1 dk2 lt2 accent1 accent2 accent3 accent4 accent5 accent6 hlink folHlink
 
-(``dk1``/``lt1`` are frequently authored as ``a:sysClr`` — windowText / window —
+(``dk1``/``lt1`` are frequently authored as ``a:sysClr`` - windowText / window -
 hence the ``lastClr`` resolution.)
 """
 from __future__ import annotations
@@ -195,7 +195,7 @@ def apply_tint(hex_value: str, tint: float) -> str:
     """Apply legacy ``tint`` (linear blend toward WHITE).
 
     ``tint`` is the fraction in [0,1] (``tint=40000`` -> ``0.40``). Office:
-    ``out = c*tint + 255*(1-tint)`` — higher tint keeps more of the base color.
+    ``out = c*tint + 255*(1-tint)`` - higher tint keeps more of the base color.
     """
     r, g, b = hex_to_rgb(hex_value)
     return rgb_to_hex(
@@ -209,7 +209,7 @@ def apply_shade(hex_value: str, shade: float) -> str:
     """Apply legacy ``shade`` (linear blend toward BLACK).
 
     ``shade`` is the fraction in [0,1] (``shade=60000`` -> ``0.60``). Office:
-    ``out = c*shade`` — higher shade keeps more of the base color.
+    ``out = c*shade`` - higher shade keeps more of the base color.
     """
     r, g, b = hex_to_rgb(hex_value)
     return rgb_to_hex(r * shade, g * shade, b * shade)
@@ -219,7 +219,7 @@ def apply_transforms(hex_value: str, transforms: dict) -> str:
     """Apply an ordered set of DrawingML modifiers to a base hex.
 
     ``transforms`` is a mapping that may contain any of:
-        ``lumMod`` / ``lumOff`` / ``tint`` / ``shade`` — each either a fraction
+        ``lumMod`` / ``lumOff`` / ``tint`` / ``shade`` - each either a fraction
         (``0.75``) or an OOXML thousandths integer (``75000``); values > 1 are
         interpreted as thousandths and divided by 100000. ``alpha`` is accepted
         and *recorded conceptually* but does not change the opaque hex (alpha is
@@ -270,7 +270,7 @@ def resolve_theme_color(
 
     Returns:
         The normalized resolved hex, or ``None`` if the slot is unknown/missing
-        (caller treats ``None`` as "inherited — not a brand violation").
+        (caller treats ``None`` as "inherited - not a brand violation").
     """
     alias = {"tx1": "dk1", "bg1": "lt1", "tx2": "dk2", "bg2": "lt2"}
     key = alias.get(slot, slot)

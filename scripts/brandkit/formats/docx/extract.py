@@ -169,7 +169,7 @@ def _profile_markdown(profile: dict) -> str:
         style = resolver.get("style_name") or resolver.get("style_id")
         usage = entry.get("usage") or {}
         usage_str = _usage_str(usage)
-        lines.append(f"- `{rid}`: {style} ({entry.get('status')}) — {usage_str}")
+        lines.append(f"- `{rid}`: {style} ({entry.get('status')}) - {usage_str}")
     return "\n".join(lines) + "\n"
 
 
@@ -200,7 +200,7 @@ def _structure_markdown(profile: dict) -> list[str]:
         flag_str = (" · " + " · ".join(flags)) if flags else ""
         lines.append(
             f"{region.get('order')}. **{region.get('region')}** "
-            f"(`{region.get('role')}`){flag_str} — {region.get('evidence', '')}"
+            f"(`{region.get('role')}`){flag_str} - {region.get('evidence', '')}"
         )
     return lines
 

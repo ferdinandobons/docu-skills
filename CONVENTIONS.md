@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: MIT -->
-# office-skills — Frozen Conventions
+# office-skills - Frozen Conventions
 
 This is the **single source of truth** for the vocabulary of `office-skills`. It is
 owned by `scripts/brandkit/profile/schema.py`; this document is its human-readable
@@ -7,8 +7,8 @@ mirror. Every `SKILL.md`, command, and reference doc quotes these names **verbat
 If a name here disagrees with code, the code (the schema module) wins and this file
 is the bug.
 
-> **The one hard rule.** Brand-specific identifiers — style names, theme color
-> tokens, font names, cover aliases, layout ids, chart-template ids — live in the
+> **The one hard rule.** Brand-specific identifiers - style names, theme color
+> tokens, font names, cover aliases, layout ids, chart-template ids - live in the
 > Brand Profile and **nowhere else**. No IntermediateDocument block, and no writer,
 > ever contains a literal style name, hex color, or font. The resolver is the only
 > code that reads them. Off-brand output is impossible by construction.
@@ -88,18 +88,18 @@ The binary shell is **byte-for-byte** (never round-tripped from JSON). The JSON
 These constants and enums are defined in `schema.py`. Do not invent synonyms.
 
 ### Discriminator
-- **`kind`** — the format discriminator. Values: **`docx` | `pptx` | `xlsx`**.
+- **`kind`** - the format discriminator. Values: **`docx` | `pptx` | `xlsx`**.
   (Never `doc_type`.) Selects which `surface.*` block and which resolver types are legal.
 
 ### Schema version
-- **`schema_version`** — semver string. Current: **`1.1.0`** (`SCHEMA_VERSION`).
+- **`schema_version`** - semver string. Current: **`1.1.0`** (`SCHEMA_VERSION`).
   The 1.1.0 minor bump is **additive**: the optional `structure` section and the
   optional per-role `usage` object (see §12). 1.0.0 profiles lacking either stay
-  valid — `validate()` never rejects a profile for missing them.
+  valid - `validate()` never rejects a profile for missing them.
 - `$schema` id: `https://office-skills/schema/profile-1.json` (`SCHEMA_ID`).
 
 ### Role registry
-- **`roles`** — the join table from semantic role id → concrete resolver descriptor.
+- **`roles`** - the join table from semantic role id → concrete resolver descriptor.
   (Never `bindings`.) `roles._index` lists every concrete role id.
 
 ### Resolver types (`resolver.type`)
@@ -114,15 +114,15 @@ These constants and enums are defined in `schema.py`. Do not invent synonyms.
 
 (The redundant `layout_placeholder` is **dropped**.)
 
-### Status (capability maturity) — `Status`
+### Status (capability maturity) - `Status`
 **`robust` | `best_effort` | `stub`**. Maturity is *data, not structure*: the
 schema holds charts/SmartArt from day one at `stub`; generation degrades gracefully
 below `robust`.
 
-### Severity (QA findings) — `Severity`
+### Severity (QA findings) - `Severity`
 **`INFO` | `WARNING` | `ERROR`**.
 
-### Verification status — `VerificationStatus`
+### Verification status - `VerificationStatus`
 **`passed` | `passed_with_warnings` | `failed` | `unverified`**. Stamped into
 `verification.status`. `verify --accept` additionally sets `verification.accepted =
 true` when the run passed (and is a no-op otherwise).
@@ -131,23 +131,23 @@ true` when the run passed (and is a no-op otherwise).
 Beyond the required envelope keys (`REQUIRED_TOP_KEYS` in `schema.py`), each
 extractor stamps two **optional** top-level objects (not validated by `validate()`,
 so 1.0.0 profiles may omit them):
-- **`artifact_catalog`** — a broad, descriptive inventory of the template beyond the
+- **`artifact_catalog`** - a broad, descriptive inventory of the template beyond the
   directly-generatable roles: OOXML/media parts, styles, sections/margins, and
   format-specific extras (docx: paragraph samples + table counts; pptx: layouts,
   masters, placeholder geometry, slide texts, slide size; xlsx: named ranges,
   formulas, sheet dimensions, tables, merged cells, row/column sizing, number
   formats). Read it to mimic a specific template piece; it is **not** a resolver.
-- **`capabilities`** — what this profile can generate today, per kind. Descriptive
+- **`capabilities`** - what this profile can generate today, per kind. Descriptive
   only; the resolver and QA gate are the enforcement, not this key.
 
-### Anchor kind — `AnchorKind`
+### Anchor kind - `AnchorKind`
 **`sdt_anchored` | `placeholder` | `named_range` | `NONE`**. Anchor presence is
 first-class: when no cover anchors exist, the kind is `NONE` (never a silently
 empty list).
 
-### Overflow capability — `OverflowCapability`
+### Overflow capability - `OverflowCapability`
 **`estimator` (pptx) | `cellfit` (xlsx) | `render` (docx) | `none`**. DOCX has **no
-deterministic overflow estimator** — Word reflows; overflow is a render-time (L1/L2)
+deterministic overflow estimator** - Word reflows; overflow is a render-time (L1/L2)
 concern only.
 
 ---
@@ -227,8 +227,8 @@ is **sugar** normalized to `[{"t": "..."}]` on parse.
 | `toc` | `title?`, `max_level` | refreshes the live TOC field |
 | `image` | `asset?`/`src?`, `alt?`, `caption?`, `width_emu?`, `height_emu?` | image placement |
 | `quote` | `runs`, `attribution?` | `quote` (falls back to body) |
-| `divider` | — | brand divider |
-| `pagebreak` | — | page (docx) / slide (pptx) break |
+| `divider` | - | brand divider |
+| `pagebreak` | - | page (docx) / slide (pptx) break |
 
 `callout.intent` ∈ `info | warning | danger | success | note` (semantic; the **brand**
 decides the color). The author **never** picks a style.
@@ -247,26 +247,26 @@ The document's `cover` carries semantic slots only: `title`, `subtitle`, `fields
 
 ---
 
-## 7. Generate — mandatory order
+## 7. Generate - mandatory order
 
 Enforced by one orchestrator; the author cannot reorder steps.
 
-1. `expand_components` — component/section refs → primitives.
-2. `validate_iid` — capability pre-flight (degradations reported **before** writing).
+1. `expand_components` - component/section refs → primitives.
+2. `validate_iid` - capability pre-flight (degradations reported **before** writing).
 3. **Open the shell** (`Document(shell)`, never blank).
-4. `clear_body_region` — remove **only** the freeform body region, **preserving**
+4. `clear_body_region` - remove **only** the freeform body region, **preserving**
    the ordered cover region and the TOC region (and the final `sectPr`). Boundary
    by region evidence, never index (§11). Never wipes the whole body.
-5. `compose_cover` — fill the **preserved** cover anchors in place (sole author of
+5. `compose_cover` - fill the **preserved** cover anchors in place (sole author of
    the cover; never recreates it after a wipe).
-6. `compose_body` — resolver-driven flat dispatch; new blocks are appended into the
+6. `compose_body` - resolver-driven flat dispatch; new blocks are appended into the
    now-empty body region, immediately before `sectPr` (after the cover and TOC).
-7. `refresh_toc` — refresh the preserved live TOC if present (mark fields dirty /
+7. `refresh_toc` - refresh the preserved live TOC if present (mark fields dirty /
    `w:updateFields`) so Word recomputes it on open; never duplicate it. No-op when
    there is no TOC.
-8. `finalize` — set `w:updateFields` + per-field `w:dirty`; save.
+8. `finalize` - set `w:updateFields` + per-field `w:dirty`; save.
 
-The order-aware clear (steps 4–7) replaces the old "wipe the whole body" clear:
+The order-aware clear (steps 4-7) replaces the old "wipe the whole body" clear:
 the cover/TOC skeleton survives generation, so a generated document keeps the
 brand's front matter and only its body is replaced. Robust on templates with no
 cover and/or no TOC, and idempotent (re-open shell each run).
@@ -283,7 +283,7 @@ sections re-instantiate from existing layouts.
 ## 8. Unmapped-block policy
 
 `policy.unmapped_block ∈ { strict → fail | degrade → nearest-role | passthrough → paragraph.default }`,
-with `degraded=True` surfaced to QA — a block is **never** invented off-brand.
+with `degraded=True` surfaced to QA - a block is **never** invented off-brand.
 
 ---
 
@@ -292,13 +292,13 @@ with `degraded=True` surfaced to QA — a block is **never** invented off-brand.
 One library (`qa/`), shared by all skills, one entrypoint `run_qa(target, profile, plan)`.
 The gate carries an explicit **mode**: `gate_generated` | `verify_foreign`.
 
-- **L0 deterministic** — always runs, no external binaries. Style allowlist, resolved-color
+- **L0 deterministic** - always runs, no external binaries. Style allowlist, resolved-color
   palette adherence, residual placeholder/demo text, markdown literals, logo presence,
   language rules, WCAG contrast (solid resolved pairs only), table integrity, duplicate
   structure. `no_residual_template_text` runs **even when the profile had no demo region**.
-- **L1 visual** — the Claude orchestrator (or a Task subagent) reads rendered PNGs. **No
+- **L1 visual** - the Claude orchestrator (or a Task subagent) reads rendered PNGs. **No
   second model, no Bedrock, no boto3.**
-- **L2 autonomous loop** — headless; audit → repair → re-render, bounded by a cost ceiling;
+- **L2 autonomous loop** - headless; audit → repair → re-render, bounded by a cost ceiling;
   on exhaustion with residual errors → `NEEDS_HUMAN` (never reports clean on exhaustion).
 
 `--qa = fast | auto | deep`. `auto` is L0+L1 interactive (1 pass) or L0+L1+L2 headless.
@@ -307,7 +307,7 @@ The gate carries an explicit **mode**: `gate_generated` | `verify_foreign`.
 ### Off-brand color rule (resolved-comparison)
 Resolve every color through the theme + transform chain to a final hex **before**
 comparing. Accept any hex reachable from a palette slot via a stored tint/shade. Treat
-unresolved/`None` as **inherited — OK**. `ERROR` is reserved for a literal sRGB the
+unresolved/`None` as **inherited - OK**. `ERROR` is reserved for a literal sRGB the
 resolver itself wrote; in `verify_foreign` it downgrades to `WARNING` unless the palette
 is declared closed.
 
@@ -329,7 +329,7 @@ Conversions live in `common/units.py`:
 The profile records the template's **ordered top-level skeleton** in
 `profile.structure`, and annotates every reusable artifact with where/how it is
 used. Both are **additive** (a 1.0.0 profile may omit them; `validate()` never
-rejects for their absence). Detection is brand-agnostic and multilingual —
+rejects for their absence). Detection is brand-agnostic and multilingual -
 grounded in style placement / OOXML evidence, never in brand-specific names.
 
 ### `structure`
@@ -347,12 +347,12 @@ Only regions actually present are listed. `region` ∈ `cover | toc | body`. The
 `body` region is **freeform** (element order inside it is not prescribed).
 
 **Region detection (evidence, on the lxml body):**
-- **cover** — body content before the first TOC region or first Heading-1.
-- **toc** — a block-level `w:sdt` with `w:docPartGallery='Table of Contents'`, a
+- **cover** - body content before the first TOC region or first Heading-1.
+- **toc** - a block-level `w:sdt` with `w:docPartGallery='Table of Contents'`, a
   TOC/TOCHeading-styled paragraph, a `w:instrText` starting with `TOC`, or a
   heading whose text is a contents word in EN/IT/FR/DE/ES (`Contents`, `Sommario`,
   `Indice`, `Inhalt`, `Table des matières`, `Índice`, `Contenido`, …).
-- **body** — everything after the TOC (or after the cover) up to the final body
+- **body** - everything after the TOC (or after the cover) up to the final body
   `sectPr`.
 
 `anchors.toc.present` is a **real** detection result (never hardcoded).
@@ -379,7 +379,7 @@ role's usage so a reader sees what to respect in order vs use on demand.
 
 - office-skills original code: **MIT** (every engine file carries an
   `SPDX-License-Identifier: MIT` header).
-- Third-party proprietary Office helper scripts: **never vendored** — the OOXML
+- Third-party proprietary Office helper scripts: **never vendored** - the OOXML
   engine is re-implemented from scratch (CI guard `tests/test_no_proprietary.py`).
 
 Every file in the engine carries an `SPDX-License-Identifier` header.

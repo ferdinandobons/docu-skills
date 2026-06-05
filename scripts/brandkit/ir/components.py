@@ -7,7 +7,7 @@
 primitive sub-blocks. The writers cannot render a ``component``/``section`` block
 directly, so this hook expands every such block into its primitive sub-blocks
 *before* resolution. A reference the profile does not define is rejected (raised)
-rather than silently dropped — off-brand / missing content must never pass
+rather than silently dropped - off-brand / missing content must never pass
 silently.
 """
 from __future__ import annotations

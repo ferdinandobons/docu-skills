@@ -1,17 +1,17 @@
 # SPDX-License-Identifier: MIT
-"""The IntermediateDocument (IID) — the brand-agnostic flow content model.
+"""The IntermediateDocument (IID) - the brand-agnostic flow content model.
 
 This is "semantic space" (§2, §5.3): the user/LLM authors an ordered list of
 typed *blocks* carrying **intent**, never presentation. The resolver later maps
 each block to a concrete brand artifact. **No block ever names a style, hex,
-font, or layout** — that is the whole point, and the reason off-brand output is
+font, or layout** - that is the whole point, and the reason off-brand output is
 impossible by construction.
 
 The flow model (this module) serves ``docx`` and ``pptx``. The grid model for
 ``xlsx`` lives separately in ``brandkit.grid.model`` (§2 "two content models,
 one spine").
 
-Block catalog (§5.3) — ~20 types::
+Block catalog (§5.3) - ~20 types::
 
     heading paragraph list table callout kpi chart smartart component section
     cover caption toc image quote divider pagebreak
@@ -24,7 +24,7 @@ Public surface
 - The ``Block`` dataclasses + the :data:`BLOCK_TYPES` registry.
 - :class:`IntermediateDocument` with ``cover``, ``blocks``, and ``meta``.
 - ``from_dict`` / ``to_dict`` round-trips on every block and on the document.
-- :func:`parse_idoc` — accept a loose JSON dict (the on-the-wire form) and
+- :func:`parse_idoc` - accept a loose JSON dict (the on-the-wire form) and
   return a validated :class:`IntermediateDocument`.
 
 Every block subclasses :class:`Block`, which carries the discriminator

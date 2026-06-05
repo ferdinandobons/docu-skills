@@ -7,18 +7,18 @@ engine can import it without pulling in lxml / python-docx.
 
 Four concerns:
 
-1. **Rich runs** — the inline text model shared by the IntermediateDocument and
+1. **Rich runs** - the inline text model shared by the IntermediateDocument and
    the resolver. A *run* is a ``{"t": str, "b"?: bool, "i"?: bool, "u"?: bool,
    "code"?: bool, "link"?: str}`` dict. Helpers normalize loose input (a bare
    string, a list of runs, the ``text:`` sugar) into a canonical run list and
    flatten runs back to plain text.
-2. **Markdown-literal detection** — the L0 ``markdown_literal`` checker must
+2. **Markdown-literal detection** - the L0 ``markdown_literal`` checker must
    catch literal ``**bold**``, ``*i*``, `` `code` ``, ``## heading``, and table
    ``|`` pipes that leaked into rendered text. :data:`MARKDOWN_LITERAL_RE` and
    :func:`find_markdown_literals` are the shared detector.
-3. **Slug / safe filename** — deterministic, filesystem-safe identifiers for
+3. **Slug / safe filename** - deterministic, filesystem-safe identifiers for
    brand-kit directory names and asset filenames.
-4. **Name-token lexicon** — the multilingual word lists that the role-inference
+4. **Name-token lexicon** - the multilingual word lists that the role-inference
    scorer consults as its *weakest* (0.20) signal. Tokens cover EN/IT/FR/DE/ES.
 """
 from __future__ import annotations

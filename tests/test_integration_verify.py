@@ -12,7 +12,7 @@ Two layers:
    TOC marker, so the cover fill never touches the TOC.
 
 2. A real-template end-to-end test (`RealTemplateIntegrationTest`) that runs
-   extract -> generate on a real structured ``.docx`` (kept OUT of the repo — it
+   extract -> generate on a real structured ``.docx`` (kept OUT of the repo - it
    lives under ``/tmp/agents_extract`` and the brand-kit is written to a temp dir,
    never into the source tree). It asserts, from the generated ``document.xml``
    region order and content, that every reviewed critical/major leak is fixed:

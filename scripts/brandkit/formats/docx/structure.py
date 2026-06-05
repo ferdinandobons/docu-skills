@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""DOCX structure helpers — ordered skeleton detection, TOC detection, and
+"""DOCX structure helpers - ordered skeleton detection, TOC detection, and
 structure-aware body clearing.
 
 The template's *ordered document structure* (cover -> toc -> body) is first-class:
@@ -11,14 +11,14 @@ block-level ``w:sdt`` elements) and does not expose drawing text boxes.
 
 Detection is grounded in evidence, never in brand-specific names:
 
-- **Cover region** — the body-level content *before* the first TOC region or first
+- **Cover region** - the body-level content *before* the first TOC region or first
   Heading-1 paragraph. ``cover.discover_cover`` locates the cover anchors (SDTs /
   placeholders / logos); here we mark which top-level body children belong to it.
-- **TOC region** — a block-level ``w:sdt`` whose ``w:docPartGallery`` is
+- **TOC region** - a block-level ``w:sdt`` whose ``w:docPartGallery`` is
   ``Table of Contents``, OR a paragraph using a TOC/TOCHeading style, OR a
   ``w:instrText`` starting with ``TOC``, OR a heading whose text is a known
   contents word in any of EN/IT/FR/DE/ES (multilingual).
-- **Body region** — everything after the TOC (or after the cover if no TOC) up to
+- **Body region** - everything after the TOC (or after the cover if no TOC) up to
   the final body-level ``w:sectPr``.
 
 Brand-agnostic TOC detection: rather than hardcoding one template's ``TOCHeading`` /
@@ -146,7 +146,7 @@ def _element_holds_strong_toc(el) -> bool:
         (``TOC 1``…``TOC 9``, ``TableOfFigures``, localized index-entry styles).
 
     A bare contents-word heading (``Contents`` / ``Sommario``) is *not* strong on
-    its own — it is handled separately as the optional TOC *heading* that may
+    its own - it is handled separately as the optional TOC *heading* that may
     immediately precede a strong anchor.
     """
     ln = _local_name(el.tag)
@@ -236,9 +236,9 @@ def classify_body_children(doc) -> list[dict]:
     Boundaries (evidence-based, never positional):
       - the TOC region anchors on **strong** markers only (a block-level TOC sdt,
         a ``w:instrText`` ``TOC`` field, or a TOC/Table-of-Figures *entry* style).
-        It starts at the first strong anchor — extended back by one paragraph if a
+        It starts at the first strong anchor - extended back by one paragraph if a
         lone contents-word heading (``Contents``/``Sommario``) immediately precedes
-        it (that is the TOC heading) — and ends at the **last** strong anchor.
+        it (that is the TOC heading) - and ends at the **last** strong anchor.
         Stacked index front matter (a table-of-contents, then a table-of-tables and
         a table-of-figures, each a real TOC field) is preserved as one block:
         their headings/blank separators sit *between* strong anchors and travel
@@ -255,7 +255,7 @@ def classify_body_children(doc) -> list[dict]:
     body = doc.element.body
     children = list(body)
 
-    # Strong TOC anchors only — these are the structural proof of a TOC/index.
+    # Strong TOC anchors only - these are the structural proof of a TOC/index.
     strong = [
         i
         for i, el in enumerate(children)
@@ -471,7 +471,7 @@ def clear_body_region(doc, structure: Optional[dict] = None, *, preserve_cover: 
     Keeps the cover block(s) and the TOC sdt/region and the final ``sectPr``;
     removes only the in-between/after demo body content. python-docx ``add_*`` then
     appends new content into the (now-empty) body region, immediately before the
-    ``sectPr`` — which is exactly the right place.
+    ``sectPr`` - which is exactly the right place.
 
     Args:
         doc: a python-docx ``Document``.
@@ -571,7 +571,7 @@ def refresh_toc(doc) -> int:
     are left untouched, so a doc with 59 fields but 3 TOCs marks exactly 3.
 
     Returns the number of TOC fields marked dirty (0 when the template has no TOC
-    field — in which case nothing is written). Never duplicates the TOC.
+    field - in which case nothing is written). Never duplicates the TOC.
     """
     if not is_toc_present(doc):
         return 0
