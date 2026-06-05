@@ -105,6 +105,26 @@ class NameTraversalTest(unittest.TestCase):
                 store.save_profile(profile_dir, {"kind": "docx"}, b"new")
             self.assertEqual(victim.read_bytes(), b"old")
 
+    @unittest.skipIf(os.name == "nt", "symlink setup differs on Windows")
+    def test_save_profile_refuses_metadata_symlink_escape(self) -> None:
+        """profile.json/provenance writes must use the same safe writer as shell."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            outside_profile = root / "outside-profile.json"
+            outside_hash = root / "outside-provenance.sha256"
+            outside_profile.write_text("old-profile", encoding="utf-8")
+            outside_hash.write_text("old-hash", encoding="utf-8")
+
+            profile_dir = root / "brand-kit" / "acme"
+            profile_dir.mkdir(parents=True)
+            (profile_dir / "profile.json").symlink_to(outside_profile)
+            (profile_dir / store.SHELL_HASH_FILE).symlink_to(outside_hash)
+
+            with self.assertRaises(store.ProfileStoreError):
+                store.save_profile(profile_dir, {"kind": "docx"}, b"new")
+            self.assertEqual(outside_profile.read_text(encoding="utf-8"), "old-profile")
+            self.assertEqual(outside_hash.read_text(encoding="utf-8"), "old-hash")
+
 
 # ---------------------------------------------------------------------------
 # Provenance drift - shell hash must be load-bearing in QA

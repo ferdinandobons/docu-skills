@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         loaded.profile["verification"]["status"] = report.verdict
         loaded.profile["verification"]["roles_total"] = len(schema.list_role_ids(loaded.profile))
         loaded.profile["verification"]["roles_verified"] = loaded.profile["verification"]["roles_total"]
-        profile_json.write_text(json.dumps(loaded.profile, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        store.write_profile_json(loaded.directory, loaded.profile)
         print(f"extracted {args.name} -> {profile_json}")
         return 0 if report.passed else 1
     if args.cmd == "verify":
@@ -91,10 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         loaded.profile["verification"]["status"] = report.verdict
         if args.accept and report.passed:
             loaded.profile.setdefault("verification", {})["accepted"] = True
-        (loaded.directory / "profile.json").write_text(
-            json.dumps(loaded.profile, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        store.write_profile_json(loaded.directory, loaded.profile)
         for finding in report.findings:
             print(f"{finding.severity} {finding.check}: {finding.message}")
         print(f"verification: {report.verdict}")
@@ -151,10 +148,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         generated_by = comp.pop("generated_by", None) if isinstance(comp, dict) else None
         result = comprehension_mod.merge(loaded.profile, comp, generated_by=generated_by)
-        (loaded.directory / "profile.json").write_text(
-            json.dumps(loaded.profile, indent=2, ensure_ascii=False, sort_keys=False) + "\n",
-            encoding="utf-8",
-        )
+        store.write_profile_json(loaded.directory, loaded.profile)
         if not result.ok:
             print(f"comprehension REJECTED ({len(result.problems)} problem(s)):")
             for problem in result.problems:

@@ -100,20 +100,23 @@ def _probe_visual_pipeline(paths: dict[str, str | None]) -> tuple[bool, str | No
         doc.save(docx_path)
 
         soffice_path = paths.get("soffice") or "soffice"
-        soffice = subprocess.run(
-            [
-                soffice_path,
-                "--headless",
-                "--convert-to",
-                "pdf",
-                "--outdir",
-                str(pdf_dir),
-                str(docx_path),
-            ],
-            capture_output=True,
-            timeout=VISUAL_PIPELINE_TIMEOUT_S,
-            check=False,
-        )
+        try:
+            soffice = subprocess.run(
+                [
+                    soffice_path,
+                    "--headless",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    str(pdf_dir),
+                    str(docx_path),
+                ],
+                capture_output=True,
+                timeout=VISUAL_PIPELINE_TIMEOUT_S,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return False, f"soffice convert failed: {exc}"
         if soffice.returncode != 0:
             return False, "soffice convert failed: " + (
                 _short_output(soffice.stderr)
@@ -126,19 +129,22 @@ def _probe_visual_pipeline(paths: dict[str, str | None]) -> tuple[bool, str | No
             return False, "soffice convert produced no PDF"
 
         pdftoppm_path = paths.get("pdftoppm") or "pdftoppm"
-        toppm = subprocess.run(
-            [
-                pdftoppm_path,
-                "-png",
-                "-r",
-                "50",
-                str(pdfs[0]),
-                str(png_dir / "page"),
-            ],
-            capture_output=True,
-            timeout=VISUAL_PIPELINE_TIMEOUT_S,
-            check=False,
-        )
+        try:
+            toppm = subprocess.run(
+                [
+                    pdftoppm_path,
+                    "-png",
+                    "-r",
+                    "50",
+                    str(pdfs[0]),
+                    str(png_dir / "page"),
+                ],
+                capture_output=True,
+                timeout=VISUAL_PIPELINE_TIMEOUT_S,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return False, f"pdftoppm failed: {exc}"
         if toppm.returncode != 0:
             return False, "pdftoppm failed: " + (
                 _short_output(toppm.stderr)

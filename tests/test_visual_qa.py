@@ -188,6 +188,26 @@ class RendererAvailabilityTest(unittest.TestCase):
         self.assertIn("soffice convert failed", status["binary_errors"]["visual_qa"])
         self.assertTrue(any("--convert-to" in call for call in calls))
 
+    def test_probe_marks_visual_unavailable_when_conversion_times_out(self) -> None:
+        orig_which = doctor.shutil.which
+        orig_run = subprocess.run
+        try:
+            doctor.shutil.which = lambda name: f"/fake/{name}"
+
+            def fake_run(args, *unused_args, **unused_kwargs):
+                if "--convert-to" in args:
+                    raise subprocess.TimeoutExpired(args, 1)
+                return SimpleNamespace(returncode=0, stdout=b"version ok", stderr=b"")
+
+            subprocess.run = fake_run
+            status = doctor.probe()
+        finally:
+            doctor.shutil.which = orig_which
+            subprocess.run = orig_run
+
+        self.assertFalse(status["visual_qa"])
+        self.assertIn("timed out", status["binary_errors"]["visual_qa"])
+
 
 # ---------------------------------------------------------------------------
 # §7.2 Manifest + checklist (model-free)

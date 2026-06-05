@@ -352,15 +352,27 @@ def save_profile(
         _write_under(root, rel, data)
 
     # 3) The profile.json itself (deterministic, sorted keys, trailing newline).
-    pj.write_text(
-        json.dumps(profile, indent=2, ensure_ascii=False, sort_keys=False) + "\n",
-        encoding="utf-8",
-    )
+    write_profile_json(root, profile)
 
     # 4) The standalone shell-hash sidecar (mirrors provenance.shell.sha256).
-    (root / SHELL_HASH_FILE).write_text(shell_hash + "\n", encoding="utf-8")
+    write_shell_hash(root, shell_hash)
 
     return pj
+
+
+def write_profile_json(directory: PathLike, profile: dict) -> Path:
+    """Write ``profile.json`` under a profile dir using the safe writer."""
+    root = Path(directory)
+    data = json.dumps(profile, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
+    _write_under(root, PROFILE_JSON, data)
+    return root / PROFILE_JSON
+
+
+def write_shell_hash(directory: PathLike, shell_hash: str) -> Path:
+    """Write the provenance sidecar under a profile dir using the safe writer."""
+    root = Path(directory)
+    _write_under(root, SHELL_HASH_FILE, shell_hash + "\n")
+    return root / SHELL_HASH_FILE
 
 
 def _write_under(root: Path, rel: str, data: Union[bytes, str]) -> None:
