@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Deterministic builder for the COMPLEX synthetic PPTX fixture.
+"""Deterministic builder for the COMPLEX synthetic PPTX example template.
 
 Produces ``examples/templates/docuskills_template.pptx``: a 100% synthetic
 (made-up "DocuSkills Corp" brand, never proprietary) deck that stresses the
@@ -39,7 +39,7 @@ NOTE - what is APPROXIMATED / SKIPPED (python-pptx limits, by design):
   * New custom slide masters / layouts cannot be created from scratch by
     python-pptx; this deck REUSES the default template's master + layouts (the
     task allows exactly this). Theme COLORS/FONTS are the ones that ship with
-    the default template; an DocuSkills palette is applied at the shape level.
+    the default template; a DocuSkills palette is applied at the shape level.
 
 Reproducibility: no randomness, no wall-clock. The core-properties timestamps
 are pinned to a fixed instant and the embedded PNG bytes are computed
@@ -47,7 +47,7 @@ deterministically, so re-running the builder yields a byte-identical file
 (CI-friendly).
 
 Run:
-    PYTHONPATH=scripts .venv/bin/python tests/fixtures/builders/build_complex_pptx.py
+    PYTHONPATH=scripts .venv/bin/python examples/builders/build_docuskills_pptx.py
 """
 from __future__ import annotations
 
@@ -61,6 +61,8 @@ from lxml import etree
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.dml.color import RGBColor
+
+from _brandlib import freeze_ooxml
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
@@ -102,7 +104,7 @@ SECTION_EXT_URI = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"
 # A tiny synthetic PNG generated in-process (no external/proprietary asset).
 # ---------------------------------------------------------------------------
 def _synthetic_png() -> bytes:
-    """Return bytes of a deterministic 96x40 RGBA PNG (an 'DocuSkills' brand block).
+    """Return bytes of a deterministic 96x40 RGBA PNG: a DocuSkills brand block.
 
     Navy field with an amber stripe and a teal corner - a purely decorative,
     made-up mark so the fixture carries a real ``<p:pic>`` / image part without
@@ -523,6 +525,7 @@ def build(out: Path = OUT) -> Path:
     buf = BytesIO()
     prs.save(buf)
     out.write_bytes(buf.getvalue())
+    freeze_ooxml(out)
     return out
 
 

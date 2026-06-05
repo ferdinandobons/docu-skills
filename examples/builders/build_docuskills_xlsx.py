@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Deterministic builder for the COMPLEX synthetic XLSX fixture.
+"""Deterministic builder for the COMPLEX synthetic XLSX example template.
 
 Produces ``examples/templates/docuskills_template.xlsx``: a 100% synthetic
 (DocuSkills-style, never proprietary) workbook that stresses the brand-xlsx engine
@@ -30,7 +30,7 @@ The output is byte-reproducible: a fixed timestamp / fixed image bytes / sorted
 defined names, so re-running the builder yields an identical file (CI-friendly).
 
 Run:
-    PYTHONPATH=scripts .venv/bin/python tests/fixtures/builders/build_complex_xlsx.py
+    PYTHONPATH=scripts .venv/bin/python examples/builders/build_docuskills_xlsx.py
 """
 from __future__ import annotations
 
@@ -44,6 +44,8 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.formatting.rule import CellIsRule, ColorScaleRule, FormulaRule
 from openpyxl.styles import Alignment, Border, Font, NamedStyle, PatternFill, Side
 from openpyxl.utils import get_column_letter
+
+from _brandlib import freeze_ooxml, rgba
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
@@ -61,15 +63,16 @@ WHITE = "FFFFFFFF"
 # A tiny synthetic PNG logo generated in-process (no external asset).
 # ---------------------------------------------------------------------------
 def _synthetic_logo_png() -> bytes:
-    """Return bytes of a deterministic 64x24 RGBA PNG (an 'DocuSkills' navy block).
+    """Return a deterministic 64x24 RGBA PNG: a DocuSkills navy field with an
+    amber stripe (colours derived from the brand palette constants).
 
-    Hand-built so the fixture carries a real <xdr:pic> drawing in a header
-    without committing any external/proprietary image. Pixels are a navy field
-    with an amber stripe - purely decorative brand mark.
+    Hand-built so the example template carries a real <xdr:pic> drawing in a
+    header without committing any external/proprietary image - purely a
+    decorative brand mark.
     """
     w, h = 64, 24
-    navy = (31, 56, 100, 255)
-    amber = (232, 163, 61, 255)
+    navy = rgba(DOCU_NAVY)
+    amber = rgba(DOCU_AMBER)
     raw = bytearray()
     for y in range(h):
         raw.append(0)  # PNG filter type 0 (None) per scanline
@@ -387,6 +390,7 @@ def build(out: Path = OUT) -> Path:
     wb.calculation.fullCalcOnLoad = True
     out.parent.mkdir(parents=True, exist_ok=True)
     wb.save(out)
+    freeze_ooxml(out)
     return out
 
 

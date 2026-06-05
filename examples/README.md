@@ -9,7 +9,7 @@ binaries committed here are safe by construction.
 |---|---|---|
 | [`templates/docuskills_template.docx`](templates/docuskills_template.docx) | [`builders/build_docuskills_docx.py`](builders/build_docuskills_docx.py) | multi-slot cover, three indexes (TOC + table + figure), real `numbering.xml` (2-level bullets + numbered list), a custom **DocuSkills Table** style, `SEQ` captions, a boxed **DocuSkills Callout**, a header logo, two sections, a footnote |
 | [`templates/docuskills_template.pptx`](templates/docuskills_template.pptx) | [`builders/build_docuskills_pptx.py`](builders/build_docuskills_pptx.py) | multi-placeholder cover, the deck's real masters & layouts, sections, an agenda slide, a native table + chart, a picture, a demo slide |
-| [`templates/docuskills_template.xlsx`](templates/docuskills_template.xlsx) | [`builders/build_docuskills_xlsx.py`](builders/build_docuskills_xlsx.py) | four sheets, named regions, cross-sheet formulas, number formats, named cell styles, a table, conditional formatting, frozen panes, a chart |
+| [`templates/docuskills_template.xlsx`](templates/docuskills_template.xlsx) | [`builders/build_docuskills_xlsx.py`](builders/build_docuskills_xlsx.py) | five sheets, named regions, cross-sheet formulas, number formats, named cell styles, a table, conditional formatting, frozen panes, a chart |
 
 Brand palette (cohesive with the project hero): DocuSkills navy `#16213F`, blue `#2B7CD3`,
 amber `#E0742B`, on light `#EAF1FF` / band `#DCE7FF`.
@@ -34,6 +34,7 @@ python examples/builders/build_docuskills_pptx.py
 python examples/builders/build_docuskills_xlsx.py
 ```
 
-The builders are deterministic: rebuilding yields stable templates. They are adapted from
+The builders are deterministic: all timestamps are pinned, so rebuilding yields
+byte-identical templates and the regenerate step leaves a clean git tree. They are adapted from
 the synthetic complex fixtures under `tests/fixtures/builders/`, re-themed with the
 DocuSkills brand.

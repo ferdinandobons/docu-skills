@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Deterministic builder for the COMPLEX synthetic DOCX fixture.
+"""Deterministic builder for the COMPLEX synthetic DOCX example template.
 
 Produces ``examples/templates/docuskills_template.docx``: a 100% synthetic
 (``DocuSkills Corp``, never proprietary) Word template that stresses the brand-docx
@@ -57,7 +57,7 @@ The output is byte-reproducible: every id / image byte / part is fixed, no
 random or timestamp, so re-running yields an identical file.
 
 Run:
-    PYTHONPATH=scripts .venv/bin/python tests/fixtures/builders/build_complex_docx.py
+    PYTHONPATH=scripts .venv/bin/python examples/builders/build_docuskills_docx.py
 """
 from __future__ import annotations
 
@@ -70,6 +70,8 @@ from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Twips
 from lxml import etree
+
+from _brandlib import freeze_ooxml, rgba
 
 OUT = Path(__file__).resolve().parents[1] / "templates" / "docuskills_template.docx"
 
@@ -159,10 +161,11 @@ def _p(doc, text: str = "", style_id: str | None = None):
 # A tiny synthetic PNG logo generated in-process (no external asset on disk).
 # ---------------------------------------------------------------------------
 def _synthetic_logo_png() -> bytes:
-    """Return bytes of a deterministic 96x32 RGBA PNG (an 'DocuSkills' navy block)."""
+    """Return a deterministic 96x32 RGBA PNG: a DocuSkills navy field with an
+    amber stripe (colours derived from the brand palette constants)."""
     w, h = 96, 32
-    navy = (31, 56, 100, 255)
-    amber = (232, 163, 61, 255)
+    navy = rgba(DOCU_NAVY)
+    amber = rgba(DOCU_AMBER)
     raw = bytearray()
     for y in range(h):
         raw.append(0)  # PNG filter type 0 (None) per scanline
@@ -827,6 +830,7 @@ def build(out: Path = OUT) -> Path:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(out)
+    freeze_ooxml(out)
     return out
 
 
