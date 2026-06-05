@@ -33,8 +33,12 @@ from typing import Any, Optional
 # ---------------------------------------------------------------------------
 # Pinned schema version (semver). Bump MINOR for additive, MAJOR for breaking.
 # ---------------------------------------------------------------------------
-SCHEMA_VERSION: str = "1.1.0"
+SCHEMA_VERSION: str = "1.2.0"
 SCHEMA_ID: str = "https://office-skills/schema/profile-1.json"
+
+# The comprehension sub-block carries its own independent schema tag so the
+# model-facing contract can evolve without re-versioning the whole envelope.
+COMPREHENSION_SCHEMA_VERSION: str = "comprehension-1"
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +136,61 @@ class AnchorKind(str, Enum):
     NONE = "NONE"
 
 
+# ---------------------------------------------------------------------------
+# Comprehension executor enums (Ruling A: the ONLY closed value sets the model
+# may write). Every value maps to a real generator code branch. Semantic labels
+# (semantic_role, region names, purpose, kind, evidence) are OPEN advisory tokens
+# the generator never pattern-matches on - they are NOT enums.
+# ---------------------------------------------------------------------------
+class ComprehensionStatus(str, Enum):
+    """State of the comprehension block.
+
+    ``present`` - merged + validated, frozen into the profile.
+    ``absent``  - no comprehension yet (today's deterministic path; the default
+                  every extractor stamps, including pptx/xlsx until enriched).
+    ``rejected``- a merge was attempted but failed validation (fail-closed); the
+                  findings are recorded and the model must retry.
+    """
+
+    PRESENT = "present"
+    ABSENT = "absent"
+    REJECTED = "rejected"
+
+
+class FillRule(str, Enum):
+    """What to do with a discovered cover slot at generate time.
+
+    ``in_place`` - FILL: write the bound content into the preserved anchor.
+    ``clear``    - CLEAR: empty the anchor / re-arm its placeholder prompt.
+    ``leave``    - KEEP: do not touch the anchor.
+    """
+
+    IN_PLACE = "in_place"
+    CLEAR = "clear"
+    LEAVE = "leave"
+
+
+class Reconcile(str, Enum):
+    """How to reconcile a preserved derived index with the new content.
+
+    ``regenerate`` - rebuild/refresh the index from the new content's items.
+    ``preserve``   - keep the index untouched.
+    ``clear``      - REMOVE the orphan index block (no items feed it).
+    """
+
+    REGENERATE = "regenerate"
+    PRESERVE = "preserve"
+    CLEAR = "clear"
+
+
+class Verdict(str, Enum):
+    """The demo-vs-real classification of a region."""
+
+    DEMO = "demo"
+    REAL = "real"
+    MIXED = "mixed"
+
+
 class OverflowCapability(str, Enum):
     """Per-format overflow detection mechanism (§6.5). docx never estimates."""
 
@@ -158,6 +217,18 @@ DEFAULT_L0_INVARIANTS: tuple[str, ...] = (
     "resolver_targets_exist",
     "no_literal_markdown",
     "no_residual_template_text",
+    # Fail-closed membership of every load-bearing comprehension ref against the
+    # surfaced deterministic inventories. Wired into ``run_qa`` next to
+    # ``resolver_targets_exist`` in the SAME change that added this id (the
+    # invariant list is documentation; ``run_qa`` is the enforcement). No-ops on
+    # a profile with no (or an absent) comprehension block, so it is safe for the
+    # model-free CI path and for pptx/xlsx.
+    "comprehension_targets_exist",
+    # The destructive-action floor (§6): reconciliation must never remove a
+    # preserved cover anchor / index block the deterministic layer did not also
+    # classify as placeholder/demo. Enforced at generate time by the generators
+    # surfacing a finding with this id; listed here so the invariant is declared.
+    "no_net_structure_loss",
 )
 
 DEFAULT_CONTRAST_MIN: float = 4.5
@@ -277,6 +348,9 @@ def build_envelope(
         },
         "anchors": {},
         "structure": structure if structure is not None else _empty_structure(),
+        # Additive since 1.2.0. Always present and ``absent`` by default so the
+        # deterministic path is the ground truth until ``comprehend`` runs.
+        "comprehension": empty_comprehension(),
         "qa": {
             "l0_invariants": list(DEFAULT_L0_INVARIANTS),
             "overflow_capability": DEFAULT_OVERFLOW_CAPABILITY[kind],
@@ -388,6 +462,12 @@ def validate(profile: dict) -> list[str]:
     # structure block (optional, additive since 1.1.0). Absent is fine; present
     # must be well-shaped.
     problems.extend(_validate_structure(profile.get("structure")))
+
+    # comprehension block (optional, additive since 1.2.0). Absent is fine and is
+    # the default; present must be well-shaped (shape-only - membership of refs
+    # against the surfaced inventories is the fail-closed QA check's job, not
+    # this structural validator's). NEVER required.
+    problems.extend(_validate_comprehension(profile.get("comprehension")))
 
     # surface must contain exactly the one kind sub-block.
     surface = profile.get("surface")
@@ -521,8 +601,27 @@ def _validate_roles(roles: Any, kind: Optional[str]) -> list[str]:
 # Legal vocabulary for the per-artifact ``usage`` annotation (additive, 1.1.0).
 USAGE_SCOPES: frozenset[str] = frozenset({"cover", "toc", "body", "anywhere"})
 USAGE_PLACEMENTS: frozenset[str] = frozenset({"structural", "freeform"})
-# Legal vocabulary for a ``structure.skeleton`` region.
+
+# Region NAMES are OPEN tokens (schema 1.2.0). The docx derivation still uses the
+# canonical {cover,toc,body} trio and pptx/xlsx may use their own honest names
+# (agenda, appendix, sheet, ...); none of these is a frozen MATCHING rule. A
+# region name is validated for *syntax only* (same shape as a role id) so a typo
+# is caught without committing a per-format word-list (which would re-commit the
+# lexicon sin). The legacy trio is kept as documentation of the docx convention,
+# never as the validation gate.
 STRUCTURE_REGIONS: frozenset[str] = frozenset({"cover", "toc", "body"})
+# The four boolean/closed attributes the generator is allowed to branch on. Same
+# four for every format; this REPLACES per-format region word-lists.
+STRUCTURE_REGION_ATTRS: tuple[str, ...] = ("freeform", "demo", "ordered", "required")
+
+
+def is_valid_region_token(name: Any) -> bool:
+    """Return True if ``name`` is a syntactically valid OPEN region token.
+
+    A region token has the same shape as a role id (dotted lowercase path), so a
+    typo is caught structurally without freezing a per-format vocabulary.
+    """
+    return isinstance(name, str) and bool(_ROLE_ID_RE.match(name))
 
 
 def _validate_usage(path: str, usage: Any) -> list[str]:
@@ -569,14 +668,223 @@ def _validate_structure(structure: Any) -> list[str]:
             problems.append(f"structure.skeleton[{i}]: must be an object")
             continue
         rname = region.get("region")
-        if rname not in STRUCTURE_REGIONS:
+        # OPEN token (schema 1.2.0): validated for SYNTAX only, never against a
+        # frozen per-format word-list. The generator branches on the boolean
+        # attributes below, not on the name.
+        if not is_valid_region_token(rname):
             problems.append(
-                f"structure.skeleton[{i}].region: illegal value {rname!r} "
-                f"(legal: {sorted(STRUCTURE_REGIONS)})"
+                f"structure.skeleton[{i}].region: not a valid region token {rname!r} "
+                f"(dotted lowercase, e.g. {sorted(STRUCTURE_REGIONS)})"
             )
         order = region.get("order")
         if order is not None and not isinstance(order, int):
             problems.append(f"structure.skeleton[{i}].order: must be an int, got {order!r}")
+        for attr in STRUCTURE_REGION_ATTRS:
+            val = region.get(attr)
+            if val is not None and not isinstance(val, bool):
+                problems.append(
+                    f"structure.skeleton[{i}].{attr}: must be a bool or null, got {val!r}"
+                )
+    return problems
+
+
+# ---------------------------------------------------------------------------
+# Comprehension block (additive, schema 1.2.0)
+# ---------------------------------------------------------------------------
+# The single canonical, additive top-level sink for model output (Ruling B). One
+# writer (``profile/comprehension.py::merge``), one home. ``roles[*].usage`` /
+# ``structure.skeleton`` / ``anchors.*`` are DERIVED from this block at merge
+# time, never written independently.
+COMPREHENSION_STATUSES: frozenset[str] = frozenset(e.value for e in ComprehensionStatus)
+FILL_RULES: frozenset[str] = frozenset(e.value for e in FillRule)
+RECONCILE_RULES: frozenset[str] = frozenset(e.value for e in Reconcile)
+VERDICTS: frozenset[str] = frozenset(e.value for e in Verdict)
+
+
+def empty_comprehension() -> dict:
+    """Return an empty-but-shaped, ``absent`` comprehension block.
+
+    This is what every extractor stamps by default (docx/pptx/xlsx) so the block
+    always exists and generation can ask ``status`` without guarding for a missing
+    key. ``absent`` ⇒ today's deterministic path.
+    """
+    return {
+        "schema_version": COMPREHENSION_SCHEMA_VERSION,
+        "status": ComprehensionStatus.ABSENT.value,
+        "generated_by": None,
+        "source_shell_sha256": None,
+        "confidence": 0.0,
+        "cover_slots": {},
+        "conventions": {"indexes": [], "sections": []},
+        "role_annotations": {},
+        "demo_classification": {"regions": []},
+    }
+
+
+def _validate_comprehension(comp: Any) -> list[str]:
+    """Validate the optional ``comprehension`` block (absent is fine).
+
+    SHAPE-ONLY (Ruling A/B). This checks that:
+      - ``status`` (if present) is in the closed :class:`ComprehensionStatus` enum;
+      - every EXECUTOR field is in its closed enum (``fill_rule`` / ``reconcile``
+        / ``verdict``);
+      - the sub-collections are the right container types and their entries carry
+        the load-bearing ref keys as strings;
+      - advisory free-text fields (``purpose`` / ``semantic_role`` / ``kind`` /
+        ``evidence`` / ``generation_rules``) are accepted as-is and NEVER gated.
+
+    It deliberately does NOT check that a ref resolves to an inventory id - that
+    is the fail-closed ``comprehension_targets_exist`` QA check (it needs the
+    surfaced inventories, and it must be able to ERROR on an empty inventory,
+    which a never-required structural validator must not do). NEVER required: a
+    profile without the key, or with ``status='absent'``, yields no problems.
+    """
+    if comp is None:
+        return []
+    problems: list[str] = []
+    if not isinstance(comp, dict):
+        return ["comprehension: must be an object"]
+
+    status = comp.get("status")
+    if status is not None and status not in COMPREHENSION_STATUSES:
+        problems.append(
+            f"comprehension.status: illegal value {status!r} "
+            f"(legal: {sorted(COMPREHENSION_STATUSES)})"
+        )
+
+    conf = comp.get("confidence")
+    if conf is not None and not isinstance(conf, (int, float)):
+        problems.append(f"comprehension.confidence: must be a number or null, got {conf!r}")
+    elif isinstance(conf, (int, float)) and not (0.0 <= float(conf) <= 1.0):
+        problems.append(f"comprehension.confidence: must be in [0,1], got {conf!r}")
+
+    sha = comp.get("source_shell_sha256")
+    if sha is not None and not isinstance(sha, str):
+        problems.append(f"comprehension.source_shell_sha256: must be a hex string or null")
+
+    # cover_slots: { <anchor_ref>: { fill_rule, binds_to?, semantic_role?, ... } }
+    slots = comp.get("cover_slots")
+    if slots is not None:
+        if not isinstance(slots, dict):
+            problems.append("comprehension.cover_slots: must be an object")
+        else:
+            for anchor_ref, slot in slots.items():
+                path = f"comprehension.cover_slots.{anchor_ref}"
+                if not isinstance(anchor_ref, str) or not anchor_ref:
+                    problems.append(f"{path}: anchor_ref key must be a non-empty string")
+                if not isinstance(slot, dict):
+                    problems.append(f"{path}: must be an object")
+                    continue
+                fr = slot.get("fill_rule")
+                if fr is not None and fr not in FILL_RULES:
+                    problems.append(
+                        f"{path}.fill_rule: illegal value {fr!r} (legal: {sorted(FILL_RULES)})"
+                    )
+                bt = slot.get("binds_to")
+                if bt is not None and not isinstance(bt, str):
+                    problems.append(f"{path}.binds_to: must be a string or null, got {bt!r}")
+
+    # conventions.indexes / conventions.sections
+    conventions = comp.get("conventions")
+    if conventions is not None:
+        if not isinstance(conventions, dict):
+            problems.append("comprehension.conventions: must be an object")
+        else:
+            problems.extend(_validate_comp_indexes(conventions.get("indexes")))
+            problems.extend(_validate_comp_sections(conventions.get("sections")))
+
+    # role_annotations: { <role_id>: { purpose?, generation_rules? } } - advisory.
+    annotations = comp.get("role_annotations")
+    if annotations is not None:
+        if not isinstance(annotations, dict):
+            problems.append("comprehension.role_annotations: must be an object")
+        else:
+            for rid, ann in annotations.items():
+                if not is_valid_role_id(rid):
+                    problems.append(
+                        f"comprehension.role_annotations.{rid}: not a valid role id"
+                    )
+                if ann is not None and not isinstance(ann, dict):
+                    problems.append(
+                        f"comprehension.role_annotations.{rid}: must be an object"
+                    )
+
+    # demo_classification.regions: [ { region_ref, verdict, evidence? } ]
+    demo = comp.get("demo_classification")
+    if demo is not None:
+        if not isinstance(demo, dict):
+            problems.append("comprehension.demo_classification: must be an object")
+        else:
+            regions = demo.get("regions")
+            if regions is not None:
+                if not isinstance(regions, list):
+                    problems.append("comprehension.demo_classification.regions: must be a list")
+                else:
+                    for i, reg in enumerate(regions):
+                        path = f"comprehension.demo_classification.regions[{i}]"
+                        if not isinstance(reg, dict):
+                            problems.append(f"{path}: must be an object")
+                            continue
+                        ref = reg.get("region_ref")
+                        if not isinstance(ref, str) or not ref:
+                            problems.append(f"{path}.region_ref: required non-empty string")
+                        verdict = reg.get("verdict")
+                        if verdict is not None and verdict not in VERDICTS:
+                            problems.append(
+                                f"{path}.verdict: illegal value {verdict!r} "
+                                f"(legal: {sorted(VERDICTS)})"
+                            )
+    return problems
+
+
+def _validate_comp_indexes(indexes: Any) -> list[str]:
+    """Validate ``comprehension.conventions.indexes`` (list of derived-index descriptors)."""
+    if indexes is None:
+        return []
+    if not isinstance(indexes, list):
+        return ["comprehension.conventions.indexes: must be a list"]
+    problems: list[str] = []
+    for i, idx in enumerate(indexes):
+        path = f"comprehension.conventions.indexes[{i}]"
+        if not isinstance(idx, dict):
+            problems.append(f"{path}: must be an object")
+            continue
+        ref = idx.get("index_ref")
+        if not isinstance(ref, str) or not ref:
+            problems.append(f"{path}.index_ref: required non-empty string")
+        rec = idx.get("reconcile")
+        if rec is not None and rec not in RECONCILE_RULES:
+            problems.append(
+                f"{path}.reconcile: illegal value {rec!r} (legal: {sorted(RECONCILE_RULES)})"
+            )
+        feeds = idx.get("feeds_from_role_id")
+        if feeds is not None and (not isinstance(feeds, str) or not is_valid_role_id(feeds)):
+            problems.append(f"{path}.feeds_from_role_id: must be a role id or null, got {feeds!r}")
+        seq = idx.get("seq_id")
+        if seq is not None and not isinstance(seq, str):
+            problems.append(f"{path}.seq_id: must be a string or null, got {seq!r}")
+    return problems
+
+
+def _validate_comp_sections(sections: Any) -> list[str]:
+    """Validate ``comprehension.conventions.sections`` (list of region descriptors)."""
+    if sections is None:
+        return []
+    if not isinstance(sections, list):
+        return ["comprehension.conventions.sections: must be a list"]
+    problems: list[str] = []
+    for i, sec in enumerate(sections):
+        path = f"comprehension.conventions.sections[{i}]"
+        if not isinstance(sec, dict):
+            problems.append(f"{path}: must be an object")
+            continue
+        ref = sec.get("region_ref")
+        if not isinstance(ref, str) or not ref:
+            problems.append(f"{path}.region_ref: required non-empty string")
+        for attr in ("required", "repeatable"):
+            val = sec.get(attr)
+            if val is not None and not isinstance(val, bool):
+                problems.append(f"{path}.{attr}: must be a bool or null, got {val!r}")
     return problems
 
 

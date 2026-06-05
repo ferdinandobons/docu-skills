@@ -24,6 +24,13 @@ def extract(template: str | Path, name: str, *, scope: str = "project", cwd: str
             "safe_area_emu": {"l": 457200, "t": 457200, "r": 457200, "b": 457200},
         }
     }
+    # Comprehension readiness gate (schema 1.2.0): build_envelope stamps the
+    # canonical ``comprehension`` block as ``status='absent'`` (today's
+    # deterministic path). pptx does NOT yet surface ``surface.pptx.{cover_anchors,
+    # fields,regions}``, so the format-uniform comprehension inventories are legally
+    # empty and ``comprehend`` simply has no ids to bind cover/index refs to. Deep
+    # fact-enrichment for pptx lands on the pptx fact milestone; do NOT force a
+    # docx-shaped cover/index inventory here.
     profile = schema.build_envelope(
         "pptx",
         {"name": name, "display_name": name},

@@ -581,5 +581,188 @@ class ComponentExpansionTest(unittest.TestCase):
         self.assertEqual([b.TYPE for b in expanded.blocks], ["heading", "paragraph"])
 
 
+# ---------------------------------------------------------------------------
+# comprehension-driven DOCX reconciliation (model-free: a hand-authored
+# comprehension exercises the same code path the model would drive). Proves the
+# Napoleon fixes: multi-slot cover FILL in place, no duplicate title, stale
+# caption-index REMOVE, and the destructive-action floor.
+# ---------------------------------------------------------------------------
+def _add_multi_paragraph_index(doc, instr):
+    """Append a caption index whose field span covers SEVERAL paragraphs.
+
+    The ``begin``/``instrText`` sit in the first paragraph, a styled entry in the
+    middle, and the closing ``end`` fldChar in a final (otherwise empty) paragraph
+    - the real-template shape that the TOC-span field-extension must cover so a
+    body clear cannot sever the field.
+    """
+    p1 = doc.add_paragraph()
+    r = p1.add_run()
+    fb = OxmlElement("w:fldChar"); fb.set(qn("w:fldCharType"), "begin"); r._r.append(fb)
+    r2 = p1.add_run()
+    it = OxmlElement("w:instrText"); it.text = instr; r2._r.append(it)
+    r3 = p1.add_run()
+    fs = OxmlElement("w:fldChar"); fs.set(qn("w:fldCharType"), "separate"); r3._r.append(fs)
+    p1.add_run("entry one .... 1")
+    doc.add_paragraph("entry two .... 2")          # a styled index entry
+    p3 = doc.add_paragraph()                        # closing end fldChar paragraph
+    re = p3.add_run()
+    fe = OxmlElement("w:fldChar"); fe.set(qn("w:fldCharType"), "end"); re._r.append(fe)
+    return p1, p3
+
+
+def _present_comp(prof, comp, *, confidence=0.9):
+    """Stamp a PRESENT, sha-current comprehension onto ``prof`` (bypassing merge)."""
+    prof.setdefault("provenance", {}).setdefault("shell", {})["sha256"] = "shellsha"
+    block = schema.empty_comprehension()
+    block["status"] = schema.ComprehensionStatus.PRESENT.value
+    block["source_shell_sha256"] = "shellsha"
+    block["confidence"] = confidence
+    block.update(comp)
+    prof["comprehension"] = block
+    return prof
+
+
+class ComprehensionReconcileTest(unittest.TestCase):
+    def _build_shell(self, td):
+        """A shell with a multi-slot cover (2 placeholder paras + 1 SDT), a real
+        outline TOC, and a stacked caption index with a multi-paragraph span."""
+        shell = Path(td) / "shell.docx"
+        doc = Document()
+        doc.add_paragraph("Brand Header")                      # para slot (leave)
+        title_p = doc.add_paragraph("Insert title here")       # para slot (title)
+        # a subtitle SDT (alias) inserted into the cover region, right AFTER the
+        # title paragraph (a raw body.append would land after the final sectPr).
+        sdt = OxmlElement("w:sdt")
+        sdtPr = OxmlElement("w:sdtPr")
+        alias = OxmlElement("w:alias"); alias.set(qn("w:val"), "Subtitle"); sdtPr.append(alias)
+        sdt.append(sdtPr)
+        sdtContent = OxmlElement("w:sdtContent")
+        sp = OxmlElement("w:p"); sr = OxmlElement("w:r"); st = OxmlElement("w:t")
+        st.text = "Subtitle prompt"; sr.append(st); sp.append(sr); sdtContent.append(sp)
+        sdt.append(sdtContent)
+        title_p._p.addnext(sdt)
+        _add_toc_field(doc, 'TOC \\o "1-3" \\h')               # outline TOC
+        doc.add_paragraph("Index of Tables")                   # index heading
+        _add_multi_paragraph_index(doc, 'TOC \\h \\c "Tabella"')  # caption index
+        doc.add_paragraph("Body Heading", style="Heading 1")
+        doc.save(shell)
+        return shell
+
+    def _profile_for(self, shell):
+        from brandkit.formats.docx import extract as docx_extract
+        import tempfile, os, json
+        # Extract a real profile so the surfaced inventory ids are authentic.
+        with tempfile.TemporaryDirectory() as ed:
+            old = Path.cwd(); os.chdir(ed)
+            try:
+                pj = docx_extract.extract(shell, "recon", scope="project")
+                return json.loads(Path(pj).read_text())
+            finally:
+                os.chdir(old)
+
+    def test_multi_slot_cover_fill_no_duplicate_and_index_removed(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            shell = self._build_shell(td)
+            prof = self._profile_for(shell)
+            s = prof["surface"]["docx"]
+            anchor_ids = [a["id"] for a in s["cover_anchors"]]
+            field_ids = [f["id"] for f in s["fields"]]
+            # The multi-slot cover surfaced 3 slots; the caption index surfaced.
+            self.assertEqual(len(anchor_ids), 3, anchor_ids)
+            tabella = next(f["id"] for f in s["fields"] if f["seq_id"] == "Tabella")
+            title_anchor = next(
+                a["id"] for a in s["cover_anchors"]
+                if "Insert title here" in (a.get("placeholder") or "")
+            )
+            sub_anchor = next(
+                a["id"] for a in s["cover_anchors"]
+                if "Subtitle" in (a.get("placeholder") or "")
+            )
+            comp = {
+                "cover_slots": {
+                    title_anchor: {"binds_to": "title", "fill_rule": "in_place",
+                                   "demo_value": "Insert title here"},
+                    sub_anchor: {"binds_to": "subtitle", "fill_rule": "in_place",
+                                 "demo_value": "Subtitle prompt"},
+                },
+                "conventions": {
+                    "indexes": [
+                        {"index_ref": tabella, "seq_id": "Tabella",
+                         "reconcile": "clear"}
+                    ],
+                    "sections": [],
+                },
+                "demo_classification": {
+                    "regions": [{"region_ref": f"region.{tabella}", "verdict": "demo"}]
+                },
+            }
+            _present_comp(prof, comp)
+            out = Path(td) / "out.docx"
+            findings: list[Finding] = []
+            docx_generate.generate(prof, shell, ir.IntermediateDocument(
+                blocks=[ir.Heading(level=1, runs=[{"t": "Real Section"}])],
+                cover=ir.Cover(title=[{"t": "Real Title"}], subtitle=[{"t": "Real Subtitle"}]),
+            ), out, findings=findings)
+            gen = Document(out)
+            text = "".join(t.text or "" for t in gen.element.body.iter(w("t")))
+            # Cover filled in place (both slots), no leftover prompt.
+            self.assertIn("Real Title", text)
+            self.assertIn("Real Subtitle", text)
+            self.assertNotIn("Insert title here", text)
+            self.assertNotIn("Subtitle prompt", text)
+            # No duplicate title appended (there WAS a title-bearing slot).
+            self.assertEqual(text.count("Real Title"), 1)
+            self.assertFalse(any(f.check == "cover_degraded" for f in findings))
+            # Stale caption index removed (entries + heading gone).
+            self.assertNotIn("entry one", text)
+            self.assertNotIn("entry two", text)
+            self.assertNotIn("Index of Tables", text)
+            # The destructive floor did not flag a net loss (verdict corroborated).
+            self.assertFalse(any(f.check == "no_net_structure_loss" for f in findings))
+
+    def test_index_clear_downgraded_when_not_corroborated(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            shell = self._build_shell(td)
+            prof = self._profile_for(shell)
+            s = prof["surface"]["docx"]
+            tabella = next(f["id"] for f in s["fields"] if f["seq_id"] == "Tabella")
+            # reconcile=clear but NO demo verdict and the content HAS a captionable
+            # item -> the destructive floor downgrades to KEEP + WARNING.
+            comp = {
+                "conventions": {"indexes": [
+                    {"index_ref": tabella, "seq_id": "Tabella", "reconcile": "clear"}
+                ], "sections": []},
+                "demo_classification": {"regions": []},
+            }
+            _present_comp(prof, comp)
+            out = Path(td) / "out.docx"
+            findings: list[Finding] = []
+            docx_generate.generate(prof, shell, ir.IntermediateDocument(
+                blocks=[ir.Caption(runs=[{"t": "Table 1. A real caption"}], target="table")],
+                cover=None,
+            ), out, findings=findings)
+            gen = Document(out)
+            text = "".join(t.text or "" for t in gen.element.body.iter(w("t")))
+            # The index was KEPT (not corroborated) and a WARNING was recorded.
+            self.assertIn("entry one", text)
+            self.assertTrue(any(f.check == "index_clear_downgraded" for f in findings))
+
+    def test_absent_comprehension_uses_deterministic_path(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            shell = self._build_shell(td)
+            prof = self._profile_for(shell)
+            # comprehension absent (default) -> today's single-title behaviour.
+            self.assertEqual(prof["comprehension"]["status"], "absent")
+            out = Path(td) / "out.docx"
+            findings: list[Finding] = []
+            cleared = covermod.compose_cover(
+                Document(shell), ir.Cover(title=[{"t": "X"}]), prof, findings=findings
+            )
+            self.assertEqual(cleared, set())  # deterministic path returns no cleared refs
+
+
 if __name__ == "__main__":
     unittest.main()

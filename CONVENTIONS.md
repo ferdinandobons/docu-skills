@@ -15,13 +15,14 @@ is the bug.
 
 ---
 
-## 1. The three verbs
+## 1. The four verbs
 
 Every skill (`brand-docx`, `brand-pptx`, `brand-xlsx`) implements the same contract:
 
 | Verb | Input | Output |
 |---|---|---|
 | **extract** | a company `.docx`/`.pptx`/`.xlsx` template | a reusable **Brand Profile** |
+| **comprehend** *(optional, model-driven)* | a saved profile + a model-authored `comprehension.json` | the profile with a validated, cached `comprehension` block |
 | **verify** | a saved Brand Profile | QA findings + a verdict (the role map lives in `PROFILE.md`) |
 | **generate** | content (free text or an IntermediateDocument) + a profile | a new on-brand document |
 
@@ -29,6 +30,26 @@ Every skill (`brand-docx`, `brand-pptx`, `brand-xlsx`) implements the same contr
 proof image, and the role-mapping table is written to `PROFILE.md` at extract time
 (not re-emitted by verify). Pass `verify --accept` to mark a passing profile as
 accepted (`verification.accepted = true`).
+
+**`comprehend` is optional and model-driven** (schema 1.2.0). `generate` works on
+the deterministic profile alone (CI/no-model); when a current comprehension is
+present it additionally reconciles preserved cover/index structures with the new
+content. The verb is realized as two CLI steps:
+
+```bash
+python scripts/brandkit/cli.py comprehend-input --name <brand>    # prints {facts, excerpt} for the model
+python scripts/brandkit/cli.py comprehend --name <brand> --input comprehension.json  # the ONLY writer
+```
+
+`comprehend-input` surfaces the bounded, format-uniform bundle the model reasons
+over (deterministic facts + a length-capped text excerpt; never raw OOXML).
+`comprehend` is the **single writer** of the `comprehension` block: it
+merge-validates the model's JSON **fail-closed** (schema shape + verbatim
+membership of every load-bearing ref against the surfaced inventories), and on a
+clean pass freezes it into `profile.json` with `status='present'`, stamping
+`source_shell_sha256` from the live shell hash. On any finding it writes
+`status='rejected'` with the findings and exits non-zero; the model retries. The
+merge is **idempotent**: comprehend-twice yields a byte-identical `profile.json`.
 
 The canonical engine entrypoint is `scripts/brandkit/cli.py`, run from the plugin
 root (the directory containing `.claude-plugin/`):
@@ -92,11 +113,15 @@ These constants and enums are defined in `schema.py`. Do not invent synonyms.
   (Never `doc_type`.) Selects which `surface.*` block and which resolver types are legal.
 
 ### Schema version
-- **`schema_version`** - semver string. Current: **`1.1.0`** (`SCHEMA_VERSION`).
-  The 1.1.0 minor bump is **additive**: the optional `structure` section and the
-  optional per-role `usage` object (see §12). 1.0.0 profiles lacking either stay
-  valid - `validate()` never rejects a profile for missing them.
+- **`schema_version`** - semver string. Current: **`1.2.0`** (`SCHEMA_VERSION`).
+  Minor bumps are **additive**: 1.1.0 added the optional `structure` section and
+  the optional per-role `usage` object (see §11); 1.2.0 adds the optional
+  top-level `comprehension` block (see §12) and opens region tokens (§12). Older
+  profiles lacking any of these stay valid - `validate()` never rejects a profile
+  for missing them.
 - `$schema` id: `https://office-skills/schema/profile-1.json` (`SCHEMA_ID`).
+- The `comprehension` sub-block carries its own tag `COMPREHENSION_SCHEMA_VERSION`
+  = **`comprehension-1`** so the model-facing contract can evolve independently.
 
 ### Role registry
 - **`roles`** - the join table from semantic role id → concrete resolver descriptor.
@@ -144,6 +169,19 @@ so 1.0.0 profiles may omit them):
 **`sdt_anchored` | `placeholder` | `named_range` | `NONE`**. Anchor presence is
 first-class: when no cover anchors exist, the kind is `NONE` (never a silently
 empty list).
+
+### Comprehension executor enums (the ONLY closed value sets the model may write)
+Per **Ruling A**, only these four fields are closed enums - each value maps to a
+real generator code branch. Every other comprehension field (`semantic_role`,
+region names, `purpose`, `kind`, `evidence`, `generation_rules`) is an **open
+advisory token** the generator never pattern-matches on.
+
+| Field | Enum | Values |
+|---|---|---|
+| `comprehension.status` | `ComprehensionStatus` | **`present` \| `absent` \| `rejected`** |
+| `cover_slots[*].fill_rule` | `FillRule` | **`in_place` \| `clear` \| `leave`** |
+| `conventions.indexes[*].reconcile` | `Reconcile` | **`regenerate` \| `preserve` \| `clear`** |
+| `demo_classification.regions[*].verdict` | `Verdict` | **`demo` \| `real` \| `mixed`** |
 
 ### Overflow capability - `OverflowCapability`
 **`estimator` (pptx) | `cellfit` (xlsx) | `render` (docx) | `none`**. DOCX has **no
@@ -375,7 +413,86 @@ role's usage so a reader sees what to respect in order vs use on demand.
 
 ---
 
-## 12. Licensing
+## 12. Comprehension block (schema 1.2.0, additive + optional)
+
+The optional top-level **`comprehension`** block is the **single canonical sink**
+for model output (**Ruling B**): one writer (the `comprehend` verb /
+`profile/comprehension.py::merge`), one home. The pre-existing additive sinks
+(`roles[*].usage`, `structure.skeleton` attrs, `anchors.*`) are **derived** from it
+at merge time, never written independently. The block is always present and
+`absent` by default (every extract stamps `empty_comprehension()`); `absent` ⇒
+today's deterministic path. `validate()` never requires it.
+
+```jsonc
+"comprehension": {
+  "schema_version": "comprehension-1",
+  "status": "present",                 // present | absent | rejected  (closed enum)
+  "generated_by": { "model": "...", "prompt_version": "...", "generated_at": "ISO-8601" },
+  "source_shell_sha256": "<hex>",      // BOUND to provenance.shell.sha256 (cache key)
+  "confidence": 0.0,                   // advisory; in [0,1]; gates DESTRUCTIVE acts
+
+  "cover_slots": {                     // KEY = verbatim id from surface.<kind>.cover_anchors
+    "<anchor_ref>": { "semantic_role": "<open token>", "purpose": "<free text>",
+                      "binds_to": "<content slot key>", "demo_value": "<captured text>",
+                      "fill_rule": "in_place" } },
+
+  "conventions": {
+    "indexes": [ { "index_ref": "<verbatim field id>", "kind": "<open token>",
+                   "seq_id": "<\\c switch arg or null>",
+                   "feeds_from_role_id": "<role id or null>",
+                   "reconcile": "regenerate" } ],
+    "sections": [ { "region_ref": "<verbatim region id>", "required": false, "repeatable": false } ] },
+
+  "role_annotations": { "<role_id>": { "purpose": "<free text>", "generation_rules": "<free text>" } },
+
+  "demo_classification": { "regions": [ { "region_ref": "<verbatim region id>",
+                                          "verdict": "demo", "evidence": "<free text>" } ] }
+}
+```
+
+### The fail-closed validation contract (`comprehension_targets_exist`)
+Every **load-bearing reference** must be a verbatim id from the surfaced
+deterministic inventories: `cover_slots[*]` keys ∈ cover-anchor inventory;
+`indexes[*].index_ref` ∈ field inventory and `feeds_from_role_id` ∈ `roles`;
+`sections[*].region_ref` / `demo_classification[*].region_ref` ∈ region inventory;
+`role_annotations` keys ∈ `roles`. Unlike resolver-consistency (which no-ops on an
+empty namespace), this check is **fail-closed**: a ref into an empty/absent
+inventory is itself an **ERROR** (`status=rejected`), because it is the **sole**
+gate for anchor/index/region refs. Enforcement is by **wiring the check into
+`run_qa`** (severity-driven verdict); its id and `no_net_structure_loss` are listed
+in `DEFAULT_L0_INVARIANTS`.
+
+### Surfaced inventories (format-uniform)
+`profile/comprehension.py::surface_inventories(profile)` returns the SINGLE
+definition both `comprehend-input` and the gate use:
+
+```jsonc
+{ "cover_anchors": [ {"id": "<anchor_ref>", ...}, ... ],
+  "fields":        [ {"id": "<index_ref>", ...}, ... ],
+  "regions":       [ {"id": "<region_ref>", ...}, ... ],
+  "roles":         [ "<role_id>", ... ] }
+```
+
+Read from `surface.<kind>.{cover_anchors,fields,regions}` (enriched per format on
+its own fact milestone; legally empty until then) and the concrete role-id list.
+
+### Cache binding (sha-bound, in code)
+A comprehension counts as **present** only when `status='present'` **and**
+`source_shell_sha256 == provenance.shell.sha256` (`store.comprehension_is_present`).
+A re-extract rebuilds the profile with a fresh `absent` block, so a drifted shell
+never reuses a stale comprehension. Generation is **idempotent**: comprehension is
+frozen at merge and never re-invoked at generate time.
+
+### Open region tokens (replaces frozen per-format region word-lists)
+`structure.skeleton[*].region` is an **open token** (validated for syntax like a
+role id, never against a frozen word-list - that would re-commit the lexicon sin).
+The only things generation branches on are the boolean attributes
+`STRUCTURE_REGION_ATTRS = (freeform, demo, ordered, required)` - the same four for
+every format.
+
+---
+
+## 13. Licensing
 
 - office-skills original code: **MIT** (every engine file carries an
   `SPDX-License-Identifier: MIT` header).

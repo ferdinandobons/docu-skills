@@ -28,6 +28,7 @@ language.
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 # ---------------------------------------------------------------------------
@@ -84,8 +85,20 @@ TOC_STYLE_TOKENS: frozenset[str] = frozenset(
     {"toc", "tableoffigures", "sommario", "indice", "inhalt", "contenido"}
 )
 
-# Leading token of a ``w:instrText`` TOC field instruction.
+# Leading token of a ``w:instrText`` TOC field instruction. This is a FIELD CODE
+# (ECMA-376), not a brand word: ``TOC`` is the literal keyword of the table-of-
+# contents/figures/tables field instruction in every language Word writes, so
+# matching it is language-invariant (the PRIMARY structural signal).
 TOC_INSTR_PREFIX = "TOC"
+
+# Regex that pulls the ``\c "<seq>"`` switch argument out of a TOC field
+# instruction OPAQUELY. A caption index (``TOC \c "<seq>"``) exposes its caption
+# SEQ identifier here; the argument is captured verbatim and never interpreted
+# (the SEQ name is data carried into the profile, NEVER a matching rule, so the
+# recognition is language-invariant whatever the template's SEQ name happens to
+# be). A bare ``TOC`` (an outline table of contents, e.g. ``TOC \o "1-3"``) has
+# no ``\c`` and yields ``None``.
+_TOC_C_SWITCH_RE = re.compile(r'\\c\s+"([^"]*)"')
 
 # Builtin Heading-1 style ids/names that mark the start of body content when no
 # TOC is present (matched case-insensitively, with spaces stripped).
@@ -293,6 +306,19 @@ def classify_body_children(doc) -> list[dict]:
         # [toc_start .. last_anchor] and then, defensively, never let the span run
         # past the first Heading-1 that follows ``last_anchor``.
         toc_end = last_anchor
+        # Extend the span to cover the closing ``end`` fldChar of any TOC/index
+        # complex field whose ``begin`` falls inside the span. A table-of-figures /
+        # table-of-tables field commonly ends one paragraph PAST its last styled
+        # entry (the lone ``w:fldChar end`` sits in an otherwise-empty paragraph);
+        # without this the closing paragraph is misclassified as body and a body
+        # clear would sever the field, leaving an unremovable orphan index. The
+        # span is anchored on the field code (``TOC``), never on a brand word.
+        for f in _toc_field_begins(children):
+            bi, ei = f["begin_index"], f["end_index"]
+            if bi is None or ei is None:
+                continue
+            if toc_start <= bi <= toc_end and ei > toc_end:
+                toc_end = ei
         toc_indices = {
             i for i in range(toc_start, toc_end + 1) if not _is_sectpr(children[i])
         }
@@ -409,6 +435,231 @@ def detect_skeleton(doc, cover_anchors: Optional[list] = None) -> dict:
         )
 
     return {"ordered": True, "skeleton": skeleton}
+
+
+# ---------------------------------------------------------------------------
+# Field / index inventory (the deterministic facts the model reasons over and
+# the validator binds to - plan §4 "fields/indexes inventory")
+# ---------------------------------------------------------------------------
+def _toc_seq_id(instr: str) -> Optional[str]:
+    """Return the ``\\c "<seq>"`` switch argument of a TOC field, or None.
+
+    Captured OPAQUELY (verbatim) from the field instruction; never interpreted.
+    A caption index (``TOC \\c "<seq>"``) yields its SEQ name; an outline
+    ``TOC \\o`` yields ``None``. Language-invariant: the argument is whatever SEQ
+    identifier the template author chose, carried into the profile as data, not a
+    matching rule.
+    """
+    m = _TOC_C_SWITCH_RE.search(instr or "")
+    return m.group(1) if m else None
+
+
+def _toc_field_begins(children: list) -> list[dict]:
+    """Find every top-level TOC/index complex field and where its span begins/ends.
+
+    Walks ``fldChar``/``instrText`` across the whole body in document order with a
+    nesting stack so each TOC instruction is attributed to its OWN enclosing
+    field, then maps the field's ``begin``/``end`` fldChars back to the top-level
+    body child that contains them. A stacked index region (a table-of-tables, then
+    a table-of-figures, each its own ``TOC \\c`` field) yields one entry per field.
+
+    Returns a list of ``{"begin_index", "end_index", "instr", "seq_id"}`` (top-
+    level body-child indices), in document order. Robust to a field whose begin and
+    end live in different paragraphs (the common case for a multi-line index).
+    """
+    out: list[dict] = []
+    # Stack frames: {"begin_owner", "instr"} for the innermost open field. The
+    # walk is done one top-level child at a time so each fldChar/instrText is
+    # attributed to the child currently being iterated (lxml element identity is
+    # not stable across separate ``iter`` passes, so a global element->owner map
+    # cannot be keyed on ``id`` - the owner index is taken from the iteration).
+    stack: list[dict] = []
+    for i, ch in enumerate(children):
+        if _is_sectpr(ch):
+            continue
+        for el in ch.iter(w("fldChar"), w("instrText")):
+            ln = _local_name(el.tag)
+            if ln == "fldChar":
+                ctype = el.get(w("fldCharType"))
+                if ctype == "begin":
+                    stack.append({"begin_owner": i, "instr": ""})
+                elif ctype == "end":
+                    if stack:
+                        frame = stack.pop()
+                        instr = frame.get("instr", "").strip()
+                        if instr.startswith(TOC_INSTR_PREFIX):
+                            out.append(
+                                {
+                                    "begin_index": frame.get("begin_owner"),
+                                    "end_index": i,
+                                    "instr": instr,
+                                    "seq_id": _toc_seq_id(instr),
+                                }
+                            )
+            elif ln == "instrText":
+                if stack:
+                    stack[-1]["instr"] += el.text or ""
+    # Order by the begin child index so the surfaced ids are stable.
+    out.sort(key=lambda f: (f["begin_index"] if f["begin_index"] is not None else 1 << 30))
+    return out
+
+
+def inventory_fields(doc) -> list[dict]:
+    """Surface every top-level TOC/index complex field as a stable-id inventory.
+
+    One entry per TOC/index field (outline table-of-contents AND each ``\\c``
+    caption index), keyed by ``field.<begin-child-index>`` - a deterministic id
+    the generator can recompute from the live tree because the cover/index front
+    matter keeps its body-child positions across generation (only the freeform
+    body region is rewritten). Each entry::
+
+        {"id": "field.18", "seq_id": "<seq>" | None, "instr": "TOC \\h \\z \\c ...",
+         "begin_index": 18, "end_index": 26}
+
+    ``seq_id`` is the OPAQUE ``\\c`` switch argument (None for an outline TOC). The
+    model binds an ``index_ref`` to one of these ids; the validator checks
+    membership; the generator reconciles by ``seq_id``. Brand- and language-
+    agnostic: the only signal is the ``TOC`` field code.
+    """
+    children = list(doc.element.body)
+    out: list[dict] = []
+    for f in _toc_field_begins(children):
+        bi = f["begin_index"]
+        if bi is None:
+            continue
+        out.append(
+            {
+                "id": f"field.{bi}",
+                "seq_id": f["seq_id"],
+                "instr": f["instr"][:200],
+                "begin_index": bi,
+                "end_index": f["end_index"],
+            }
+        )
+    return out
+
+
+def _field_span_indices(doc, field_id: str) -> Optional[list[int]]:
+    """Resolve a ``field.<begin-index>`` id to the live span of body-child indices.
+
+    Recomputes the field inventory against the live tree and returns the
+    ``[begin .. end]`` top-level body-child index range for the matching field,
+    or None when the id no longer maps. Used by index REMOVE so a stale caption
+    index can be deleted as one block.
+    """
+    for f in inventory_fields(doc):
+        if f["id"] == field_id:
+            begin = f["begin_index"]
+            end = f.get("end_index")
+            if begin is None:
+                return None
+            if end is None or end < begin:
+                end = begin
+            return list(range(begin, end + 1))
+    return None
+
+
+def _index_field_remove_indices(doc, field_id: str) -> set[int]:
+    """Return the body-child indices a REMOVE of ``field_id`` would delete.
+
+    The field's ``[begin .. end]`` span plus an immediately-preceding lone index
+    heading paragraph (a short, non-strong paragraph directly above the span: the
+    index-title heading) and any blank separators
+    between them. Resolved against the LIVE tree; never includes the final
+    ``sectPr``.
+    """
+    span = _field_span_indices(doc, field_id)
+    if not span:
+        return set()
+    children = list(doc.element.body)
+    to_remove = set(span)
+    j = min(span) - 1
+    heading_at: Optional[int] = None
+    while j >= 0 and not _is_sectpr(children[j]):
+        if _local_name(children[j].tag) != "p":
+            break
+        txt = _p_text(children[j]).strip()
+        if txt == "":
+            j -= 1
+            continue
+        if not _element_holds_strong_toc(children[j]) and len(txt) <= 120:
+            heading_at = j
+        break
+    if heading_at is not None:
+        to_remove.add(heading_at)
+        for k in range(heading_at + 1, min(span)):
+            if _local_name(children[k].tag) == "p" and _p_text(children[k]).strip() == "":
+                to_remove.add(k)
+    return {i for i in to_remove if i < len(children) and not _is_sectpr(children[i])}
+
+
+def remove_index_field(doc, field_id: str) -> bool:
+    """REMOVE one orphan caption-index block (its whole field span) in place.
+
+    Returns True if anything was removed. Never touches the final ``sectPr``. To
+    remove several indexes at once use :func:`remove_index_fields` - removing one
+    shifts the body-child indices the position-based ids encode, so the multi
+    variant resolves every target's elements against the ORIGINAL tree before
+    deleting any.
+    """
+    return remove_index_fields(doc, [field_id])
+
+
+def remove_index_fields(doc, field_ids: list[str]) -> set[str]:
+    """REMOVE several orphan caption-index blocks in one shift-safe pass.
+
+    Each ``field.<begin-index>`` id is position-based, so deleting one index would
+    invalidate the ids of those after it. This resolves every target's child
+    elements against the ORIGINAL live tree FIRST (lxml element references survive
+    sibling removal), then deletes them all. Returns the set of field ids that
+    actually removed something.
+    """
+    body = doc.element.body
+    children = list(body)
+    removed_ids: set[str] = set()
+    elements: list = []
+    for fid in field_ids:
+        idxs = _index_field_remove_indices(doc, fid)
+        if not idxs:
+            continue
+        removed_ids.add(fid)
+        elements.extend(children[i] for i in sorted(idxs))
+    # De-dup element references while preserving order, then remove.
+    seen: set[int] = set()
+    for el in elements:
+        if id(el) in seen:
+            continue
+        seen.add(id(el))
+        parent = el.getparent()
+        if parent is not None:
+            parent.remove(el)
+    return removed_ids
+
+
+def inventory_regions(doc) -> list[dict]:
+    """Surface the template's region inventory (stable ids the model binds to).
+
+    Combines the ordered top-level skeleton regions (``region.cover`` /
+    ``region.toc`` / ``region.body``, present only when the template has them) with
+    each derived-index block (``region.field.<i>`` for a ``\\c`` caption index, so
+    a ``demo_classification`` / ``sections`` ref can target a specific index span).
+    Each entry is ``{"id": <region_ref>, "kind": <open advisory token>}``.
+
+    Deterministic and recomputable at generate time; the ids never encode brand
+    words, only structural positions.
+    """
+    out: list[dict] = []
+    classes = classify_body_children(doc)
+    seen_regions: set[str] = set()
+    for c in classes:
+        region = c.get("region")
+        if region in ("cover", "toc", "body") and region not in seen_regions:
+            seen_regions.add(region)
+            out.append({"id": f"region.{region}", "kind": region})
+    for f in inventory_fields(doc):
+        if f.get("seq_id"):
+            out.append({"id": f"region.{f['id']}", "kind": "caption_index"})
+    return out
 
 
 # ---------------------------------------------------------------------------

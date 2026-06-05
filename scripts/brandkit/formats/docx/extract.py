@@ -25,6 +25,12 @@ def extract(template: str | Path, name: str, *, scope: str = "project", cwd: str
     demo_region = structure.detect_demo_region(doc)
     toc_present = structure.is_toc_present(doc)
     skeleton = structure.detect_skeleton(doc, cover_anchors)
+    # Format-uniform inventories the model reasons over and the validator binds to
+    # (plan §4): every TOC/index complex field (opaque ``\c`` seq_id) and every
+    # region. These back ``comprehension`` refs; an absent comprehension never
+    # reads them, so the deterministic path is unaffected.
+    fields = structure.inventory_fields(doc)
+    regions = structure.inventory_regions(doc)
     anchors["demo_region"] = {"present": bool(demo_region.get("present"))}
     anchors["toc"] = {"present": bool(toc_present)}
 
@@ -32,6 +38,8 @@ def extract(template: str | Path, name: str, *, scope: str = "project", cwd: str
         "docx": {
             "styles": _style_names(doc),
             "cover_anchors": cover_anchors,
+            "fields": fields,
+            "regions": regions,
             "demo_region": demo_region,
         }
     }

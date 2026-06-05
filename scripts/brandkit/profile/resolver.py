@@ -27,9 +27,19 @@ class ResolveError(LookupError):
 
 
 class ProfileResolver:
+    """Single resolution spine: maps semantic IR blocks to profile role entries.
+
+    Kind-aware (plan §4): the resolver records the profile ``kind`` so it can
+    dispatch the kind-appropriate block resolution. The docx vertical is fully
+    wired here (``resolve_block`` over the docx IR); pptx/xlsx keep their own
+    resolution today and will route through this spine in a later milestone, so
+    this stays a non-breaking, additive kind-awareness.
+    """
+
     def __init__(self, profile: dict, *, strict: bool = False) -> None:
         self.profile = profile
         self.strict = strict
+        self.kind = profile.get("kind")
         self.roles = profile.get("roles") or {}
 
     def resolve_role(self, role_id: str, *, fallback: Optional[str] = "paragraph") -> ResolvedOp:
@@ -49,6 +59,14 @@ class ProfileResolver:
         )
 
     def resolve_block(self, block: ir.Block) -> ResolvedOp:
+        """Resolve a semantic IR block to a role op (the docx dispatch).
+
+        Dispatches on the block's semantic family, returning the
+        kind-appropriate resolver from the profile. For docx every role resolves
+        to a ``named_style`` resolver (already in the profile); the same spine is
+        designed to carry pptx ``placeholder`` / xlsx ``named_range`` dispatch
+        when those generators are routed through it.
+        """
         if isinstance(block, ir.Heading):
             return self.resolve_role(schema.role_id("heading", block.level), fallback="paragraph")
         if isinstance(block, ir.Paragraph):

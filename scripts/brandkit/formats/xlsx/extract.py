@@ -26,6 +26,13 @@ def extract(template: str | Path, name: str, *, scope: str = "project", cwd: str
             "table_styles": [],
         }
     }
+    # Comprehension readiness gate (schema 1.2.0): build_envelope stamps the
+    # canonical ``comprehension`` block as ``status='absent'`` (today's
+    # deterministic path). xlsx does NOT yet surface ``surface.xlsx.{cover_anchors,
+    # fields,regions}``, so the format-uniform comprehension inventories are legally
+    # empty and ``comprehend`` has no ids to bind cover/index refs to. Region
+    # geometry + demo classification (keyed to named regions) land on the xlsx fact
+    # milestone; do NOT force a docx-shaped cover/index inventory here.
     profile = schema.build_envelope(
         "xlsx",
         {"name": name, "display_name": name},

@@ -185,8 +185,17 @@ def safe_filename(value: str, *, default: str = "file") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Multilingual name-token lexicon for role inference (weakest, 0.20 signal).
+# Multilingual name-token lexicon for role inference (WEAK PRIOR ONLY).
 # ---------------------------------------------------------------------------
+# IMPORTANT (plan §5 anti-overfitting): this lexicon is the *weakest* signal and a
+# LAST RESORT. The PRIMARY, language-invariant signals are structural OOXML facts -
+# builtin style ids (``Heading N`` / ``Title`` / ``Caption`` / ``Quote`` /
+# ``Normal``), field codes (``w:instrText`` ``TOC`` / ``TOC \c``), SDT flags
+# (alias / dataBinding / docPartGallery / showingPlcHdr), and placeholder types.
+# A role recognised *only* via this lexicon is marked best_effort / low-confidence
+# and never gates output. The lexicon only ever ADDS weak positive evidence when no
+# structural signal is available; it is never a matching rule on rendered text.
+#
 # Maps a semantic *role family* -> set of lowercase substrings that, when found
 # in a style's display name, weakly suggest that role. EN / IT / FR / DE / ES.
 # The scorer matches by lowercased substring containment, so multi-word phrases

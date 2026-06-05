@@ -46,6 +46,11 @@ def run_qa(
 
     # Deterministic resolver-target existence check (opens the shell once).
     findings = findings + checks_deterministic.check_resolver_targets(shell, profile)
+    # Fail-closed comprehension-target membership (sibling of resolver targets):
+    # every load-bearing comprehension ref must be a verbatim id from the surfaced
+    # inventories. No-ops when comprehension is absent (model-free CI path,
+    # pptx/xlsx), so it is always safe to run unconditionally here.
+    findings = findings + checks_deterministic.check_comprehension_targets(profile)
     if extra_findings:
         findings = findings + list(extra_findings)
 

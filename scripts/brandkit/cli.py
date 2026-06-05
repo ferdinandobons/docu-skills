@@ -18,6 +18,7 @@ from brandkit.formats.xlsx import extract as xlsx_extract
 from brandkit.formats.xlsx import generate as xlsx_generate
 from brandkit.grid.model import parse_grid
 from brandkit.ir.model import parse_idoc
+from brandkit.profile import comprehension as comprehension_mod
 from brandkit.profile import schema, store
 from brandkit.qa.gate import run_qa
 
@@ -43,6 +44,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--output", required=True)
     p.add_argument("--scope", default="auto", choices=("auto", "project", "global"))
     p.add_argument("--qa", default="auto", choices=("auto", "fast", "deep"))
+
+    # comprehend-input: print the bounded {facts, excerpt} bundle the MODEL reads.
+    p = sub.add_parser("comprehend-input")
+    p.add_argument("--name", required=True)
+    p.add_argument("--scope", default="auto", choices=("auto", "project", "global"))
+
+    # comprehend: merge+validate+cache a model-authored comprehension.json. This is
+    # the ONLY writer of the comprehension block.
+    p = sub.add_parser("comprehend")
+    p.add_argument("--name", required=True)
+    p.add_argument("--input", required=True, help="path to the model-authored comprehension.json")
+    p.add_argument("--scope", default="auto", choices=("auto", "project", "global"))
 
     p = sub.add_parser("list")
     p.add_argument("--scope", default="auto", choices=("auto", "project", "global"))
@@ -112,6 +125,33 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{finding.severity} {finding.check}: {finding.message}")
         print(f"generated {out}")
         return 0 if report.passed else 1
+    if args.cmd == "comprehend-input":
+        loaded = store.load_profile(args.name, args.scope)
+        bundle = comprehension_mod.comprehend_input_bundle(loaded.profile)
+        print(json.dumps(bundle, indent=2, ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.cmd == "comprehend":
+        loaded = store.load_profile(args.name, args.scope)
+        try:
+            comp = json.loads(Path(args.input).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"ERROR comprehend: cannot read {args.input}: {exc}")
+            return 1
+        generated_by = comp.pop("generated_by", None) if isinstance(comp, dict) else None
+        result = comprehension_mod.merge(loaded.profile, comp, generated_by=generated_by)
+        (loaded.directory / "profile.json").write_text(
+            json.dumps(loaded.profile, indent=2, ensure_ascii=False, sort_keys=False) + "\n",
+            encoding="utf-8",
+        )
+        if not result.ok:
+            print(f"comprehension REJECTED ({len(result.problems)} problem(s)):")
+            for problem in result.problems:
+                print(f"  {problem}")
+            return 1
+        n_slots = len(loaded.profile["comprehension"].get("cover_slots") or {})
+        n_idx = len((loaded.profile["comprehension"].get("conventions") or {}).get("indexes") or [])
+        print(f"comprehended {args.name}: {n_slots} cover slot(s), {n_idx} index convention(s) [present]")
+        return 0
     if args.cmd == "list":
         for summary in store.list_profiles():
             if args.scope != "auto" and summary.scope != args.scope:

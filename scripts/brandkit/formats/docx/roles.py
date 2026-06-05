@@ -92,9 +92,11 @@ def infer_roles(doc) -> dict:
     if toc is not None:
         add("toc", toc, 0.7, schema.Status.BEST_EFFORT.value, "TOC/contents-named paragraph style")
 
+    # Callout has no builtin style id, so the name-token lexicon is the only
+    # signal - hence best_effort / low confidence (it never gates output).
     callout = _best_name_token_style(paragraph_styles, "callout")
     if callout is not None:
-        add("callout.info", callout, 0.62, schema.Status.BEST_EFFORT.value, "name-token callout")
+        add("callout.info", callout, 0.62, schema.Status.BEST_EFFORT.value, "name-token callout (weak prior)")
 
     caption = _find_style(paragraph_styles, "Caption")
     if caption is not None:
@@ -104,9 +106,13 @@ def infer_roles(doc) -> dict:
     if quote is not None:
         add("quote", quote, 0.9, schema.Status.ROBUST.value, "builtin Quote")
 
+    # A brand's own table style is the on-brand resolver target; it is recognised
+    # via the table-family name-token lexicon (a WEAK PRIOR, hence best_effort /
+    # low confidence so it never gates output) and falls back to the builtin
+    # ``Table Grid`` style id when the template defines no custom table style.
     table = _best_name_token_style(table_styles, "table") or _find_style(table_styles, "Table Grid")
     if table is not None:
-        add("table.default", table, 0.72, schema.Status.BEST_EFFORT.value, "table style candidate")
+        add("table.default", table, 0.72, schema.Status.BEST_EFFORT.value, "table style candidate (weak prior)")
 
     if normal is not None:
         add("list.bullet.1", normal, 0.45, schema.Status.BEST_EFFORT.value, "M1 fallback list paragraph")

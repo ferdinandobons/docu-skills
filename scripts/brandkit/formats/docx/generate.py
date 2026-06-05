@@ -12,8 +12,12 @@ from brandkit.formats.docx import cover, structure
 from brandkit.formats.docx.styles import lookup_style
 from brandkit.ir import components
 from brandkit.ir import model as ir
-from brandkit.profile import schema
+from brandkit.profile import schema, store
 from brandkit.profile.resolver import ProfileResolver
+from brandkit.qa.checks_deterministic import (
+    check_index_matches_content,
+    check_no_net_structure_loss,
+)
 from brandkit.qa.model import Finding
 
 # Block types that carry no DOCX writer in the M1 vertical. They are skipped
@@ -58,22 +62,134 @@ def generate(
     struct = profile.get("structure")
     structure.clear_body_region(doc, struct, preserve_cover=True, preserve_toc=True)
 
-    # Fill the preserved cover anchors in place (never recreate the cover).
-    cover.compose_cover(doc, idoc.cover, profile, findings=sink)
+    # Fill the preserved cover anchors in place (never recreate the cover). Returns
+    # the set of cover anchor refs the reconciliation CLEARED, for the destructive
+    # floor below.
+    cleared_anchors = cover.compose_cover(doc, idoc.cover, profile, findings=sink)
 
     # Write the body blocks in the order given (the body region is freeform).
     resolver = ProfileResolver(profile)
     for block in idoc.blocks:
         _write_block(doc, profile, resolver, block, sink)
 
+    # Reconcile the preserved derived indexes (TOC/TOF/TOT) and demo regions with
+    # the new content, comprehension-steered when present (no-op when absent).
+    removed_refs = _reconcile_indexes_and_demo(doc, profile, idoc, sink)
+
     # Refresh the preserved TOC (if any) so Word recomputes it on open - the new
     # headings written into the body will be picked up. No-op when there is no TOC.
     structure.refresh_toc(doc)
+
+    # Destructive-action floor (plan §6): every cover anchor / index block the
+    # reconciliation removed must carry a corroborated destructive verdict, else
+    # ERROR (a wrong delete is not recoverable). Model-free; reads frozen verdicts.
+    if store.comprehension_is_present(profile):
+        sink.extend(check_no_net_structure_loss(cleared_anchors | removed_refs, profile))
 
     out = Path(output)
     out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(out)
     return out
+
+
+def _content_has_captionables(idoc: ir.IntermediateDocument) -> bool:
+    """True when the new content carries any captionable item (caption/table/image).
+
+    A derived caption index (table-of-tables / table-of-figures) has something to
+    point at only when the content contains captionable blocks. This is the
+    deterministic corroboration for KEEPING such an index; an empty result
+    corroborates REMOVING it (plan §6 caption/index reconciliation).
+    """
+    for block in idoc.blocks:
+        if isinstance(block, ir.Caption):
+            return True
+        if isinstance(block, ir.Table) and getattr(block, "caption", None):
+            return True
+        if isinstance(block, ir.Image) and getattr(block, "caption", None):
+            return True
+    return False
+
+
+def _reconcile_indexes_and_demo(
+    doc, profile: dict, idoc: ir.IntermediateDocument, findings: list[Finding]
+) -> set[str]:
+    """Reconcile preserved derived indexes + demo regions with the new content.
+
+    Comprehension-steered (no-op when comprehension is absent - the deterministic
+    body clear already removed stale body content, and the outline TOC is refreshed
+    separately). For each ``conventions.indexes`` entry:
+
+      - ``reconcile == clear``  -> REMOVE the orphan index block, but ONLY when the
+        destructive floor corroborates it: the model also tagged the index's own
+        region (``region.<field-id>``) ``verdict=demo``, OR the content carries no
+        captionable item the index could point at. Otherwise KEEP + WARNING.
+      - ``reconcile in {regenerate, preserve}``  -> KEEP (the outline TOC is
+        refreshed by ``refresh_toc``; a caption index is left for Word to recompute).
+
+    Demo regions tagged ``verdict=demo`` that map to a derived-index region are
+    removed via the same index path; demo regions over the freeform body are
+    already gone (the body clear). Returns the set of index refs actually removed
+    (for ``no_net_structure_loss``).
+    """
+    comp = profile.get("comprehension")
+    if not store.comprehension_is_present(profile) or not isinstance(comp, dict):
+        return set()
+
+    has_captionables = _content_has_captionables(idoc)
+    demo_region_refs = {
+        r.get("region_ref")
+        for r in (comp.get("demo_classification") or {}).get("regions") or []
+        if isinstance(r, dict) and r.get("verdict") == schema.Verdict.DEMO.value
+    }
+
+    # Collect every index ruled CLEAR whose deletion the destructive floor
+    # corroborates, then remove them all in one shift-safe pass (a position-based
+    # field id would otherwise be invalidated by a prior removal).
+    to_clear: list[str] = []
+    for idx in (comp.get("conventions") or {}).get("indexes") or []:
+        if not isinstance(idx, dict):
+            continue
+        index_ref = idx.get("index_ref")
+        if not index_ref:
+            continue
+        if idx.get("reconcile") != schema.Reconcile.CLEAR.value:
+            continue  # regenerate / preserve: keep (refresh handles the outline TOC)
+        # Destructive floor: a CLEAR is honored only with deterministic corroboration
+        # - the model also tagged the index's region demo, or the content has no
+        # captionable item the index could point at.
+        region_ref = f"region.{index_ref}"
+        corroborated = (region_ref in demo_region_refs) or (not has_captionables)
+        if not corroborated:
+            findings.append(
+                Finding(
+                    "index_clear_downgraded",
+                    schema.Severity.WARNING.value,
+                    f"index {index_ref!r} clear not corroborated "
+                    f"(no demo verdict and content has captionable items); kept",
+                )
+            )
+            continue
+        to_clear.append(index_ref)
+    removed = structure.remove_index_fields(doc, to_clear)
+
+    # Self-awareness check (plan §7): a preserved CAPTION index (one carrying a
+    # deterministic ``seq_id`` from its ``\c`` switch) that is KEPT yet has no
+    # captionable content to point at is flagged WARNING. The set of emitted SEQ
+    # classes is keyed on the opaque ``seq_id`` (never the advisory ``kind``): a
+    # caption index's seq is "emitted" only when the content carries captionable
+    # items. Empty when none, so every kept-but-stale caption index is surfaced.
+    present_seq_ids: set[str] = set()
+    if has_captionables:
+        for idx in (comp.get("conventions") or {}).get("indexes") or []:
+            if not isinstance(idx, dict):
+                continue
+            if idx.get("index_ref") in removed:
+                continue  # already cleared; not a kept index
+            seq = idx.get("seq_id")
+            if seq:
+                present_seq_ids.add(seq)
+    findings.extend(check_index_matches_content(present_seq_ids, profile))
+    return removed
 
 
 def _write_block(doc, profile: dict, resolver: ProfileResolver, block: ir.Block, findings: list[Finding]) -> None:

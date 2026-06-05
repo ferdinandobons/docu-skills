@@ -109,6 +109,12 @@ class LoadedProfile:
     def kind(self) -> str:
         return self.profile.get("kind", "")
 
+    @property
+    def comprehension_present(self) -> bool:
+        """True iff a current, sha-bound comprehension is available (see
+        :func:`comprehension_is_present`)."""
+        return comprehension_is_present(self.profile)
+
 
 class ProfileNotFoundError(FileNotFoundError):
     """Raised when a profile name cannot be resolved in any store."""
@@ -180,6 +186,29 @@ def sha256_file(path: PathLike, *, chunk: int = 1 << 20) -> str:
 def sha256_bytes(data: bytes) -> str:
     """Return the hex SHA-256 of a byte string."""
     return hashlib.sha256(data).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Comprehension cache binding (sha-bound; the cache key is the shell hash)
+# ---------------------------------------------------------------------------
+def comprehension_is_present(profile: dict) -> bool:
+    """Return True iff the profile carries a *valid, current* comprehension.
+
+    The comprehension cache is bound to the shell IN CODE (not prose): it counts
+    as present only when its ``status`` is ``present`` AND its
+    ``source_shell_sha256`` equals the live ``provenance.shell.sha256``. A drifted
+    shell (re-extract) leaves a stale comprehension whose recorded sha no longer
+    matches, so generation correctly falls back to the deterministic path until
+    ``comprehend`` is re-run. This closes the stale-reuse-on-drift hole.
+    """
+    comp = profile.get("comprehension")
+    if not isinstance(comp, dict):
+        return False
+    if comp.get("status") != "present":
+        return False
+    recorded = comp.get("source_shell_sha256")
+    live = ((profile.get("provenance") or {}).get("shell") or {}).get("sha256")
+    return bool(recorded and live and recorded == live)
 
 
 # ---------------------------------------------------------------------------
