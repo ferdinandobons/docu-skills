@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/hero.png" alt="OfficeSkills - extract a company's Word, PowerPoint or Excel template into a reusable Brand Profile, then generate unlimited on-brand documents of that same format" width="100%" />
+<img src="assets/hero.png" alt="DocuSkills - extract a company's Word, PowerPoint or Excel template into a reusable Brand Profile, then generate unlimited on-brand documents of that same format" width="100%" />
 
 <br/>
 
@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
-[![CI](https://github.com/ferdinandobons/office-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/ferdinandobons/office-skills/actions/workflows/ci.yml)
+[![CI](https://github.com/ferdinandobons/docu-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/ferdinandobons/docu-skills/actions/workflows/ci.yml)
 [![Skills](https://img.shields.io/badge/skills-docx%20·%20pptx%20·%20xlsx-6EA8FE.svg)](#the-three-skills)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-F59E0B.svg)](#project-status)
 
@@ -18,7 +18,7 @@
 
 ## Contents
 
-- [What is OfficeSkills?](#what-is-officeskills)
+- [What is DocuSkills?](#what-is-docuskills)
 - [Why not just ask an AI to "use this template"?](#why-not-just-ask-an-ai-to-use-this-template)
 - [Highlights](#highlights)
 - [How it works](#how-it-works)
@@ -33,9 +33,9 @@
 
 ---
 
-## What is OfficeSkills?
+## What is DocuSkills?
 
-**OfficeSkills** is an **agent-skill bundle** - for Claude Code, Codex, and compatible AI agents - that turns a company's existing Office template into a **reusable brand memory**, then writes new documents that stay faithful to it.
+**DocuSkills** is an **agent-skill bundle** - for Claude Code, Codex, and compatible AI agents - that turns a company's existing Office template into a **reusable brand memory**, then writes new documents that stay faithful to it.
 
 You give it one branded `.docx`, `.pptx`, or `.xlsx`. It **extracts** the brand - theme colors and fonts, named styles, the document's *structure*, layouts, cover anchors, logos and tables - into a portable **Brand Profile**. From then on, every document it **generates** is built *from the original template shell* and uses *only* the artifacts the template actually defines. Each format stays in its own lane: a Word template makes Word documents, a deck makes decks, a workbook makes workbooks - there is no cross-format conversion.
 
@@ -43,9 +43,9 @@ You give it one branded `.docx`, `.pptx`, or `.xlsx`. It **extracts** the brand 
 
 ### Why not just ask an AI to "use this template"?
 
-General-purpose document skills generate *freely* and only loosely imitate a reference file - fonts drift, the palette wanders, the corporate structure is lost. OfficeSkills is the opposite: narrow and faithful. It learns the template as a set of **rules and reusable parts**, remembers them in a `brand-kit/`, and **respects them** across an unlimited number of documents.
+General-purpose document skills generate *freely* and only loosely imitate a reference file - fonts drift, the palette wanders, the corporate structure is lost. DocuSkills is the opposite: narrow and faithful. It learns the template as a set of **rules and reusable parts**, remembers them in a `brand-kit/`, and **respects them** across an unlimited number of documents.
 
-|  | General-purpose Office skills | **OfficeSkills** |
+|  | General-purpose Office skills | **DocuSkills** |
 |---|---|---|
 | Mental model | "create a nice document" | "fill the company's template" |
 | Brand fidelity | best-effort imitation | **by construction** - opens from the shell, applies only its artifacts |
@@ -91,7 +91,7 @@ General-purpose document skills generate *freely* and only loosely imitate a ref
 
 ## Structure-aware, not just style-aware
 
-Most "use my template" tools copy *styling*. OfficeSkills also learns the template's **document structure** and reproduces it. During extraction it detects the ordered skeleton - typically **cover → table of contents → body** - and annotates every captured component with **how it is used**:
+Most "use my template" tools copy *styling*. DocuSkills also learns the template's **document structure** and reproduces it. During extraction it detects the ordered skeleton - typically **cover → table of contents → body** - and annotates every captured component with **how it is used**:
 
 - **Structural** parts (cover, table of contents) are kept **in order** in every generated document - the cover is filled in place, the TOC is preserved and refreshed.
 - **Freeform** parts (headings, callouts, lists, tables, quotes, captions) are styles to **use on demand**, in whatever order your content needs.
@@ -136,8 +136,8 @@ brand-kit/<name>/
 - Python packages (installed via `requirements.txt`): `python-docx>=1.1`, `python-pptx>=1.0`, `openpyxl>=3.1`, `lxml>=5.0`, `Pillow>=10.0`
 
 ```bash
-git clone https://github.com/ferdinandobons/office-skills.git
-cd office-skills
+git clone https://github.com/ferdinandobons/docu-skills.git
+cd docu-skills
 python3 -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
@@ -173,17 +173,17 @@ python scripts/brandkit/cli.py doctor
 **Claude Code** (loads all three skills + the shared engine together):
 
 ```text
-/plugin marketplace add ferdinandobons/office-skills
-/plugin install office-skills
+/plugin marketplace add ferdinandobons/docu-skills
+/plugin install docu-skills
 ```
 
 **Codex** (clone + symlink the skills):
 
 ```bash
-git clone https://github.com/ferdinandobons/office-skills.git ~/.codex/office-skills
-cd ~/.codex/office-skills && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+git clone https://github.com/ferdinandobons/docu-skills.git ~/.codex/docu-skills
+cd ~/.codex/docu-skills && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 mkdir -p ~/.codex/skills
-for s in brand-docx brand-pptx brand-xlsx; do ln -s ~/.codex/office-skills/skills/$s ~/.codex/skills/$s; done
+for s in brand-docx brand-pptx brand-xlsx; do ln -s ~/.codex/docu-skills/skills/$s ~/.codex/skills/$s; done
 ```
 
 > Restart/reload the agent after installing if the skills don't appear immediately.
