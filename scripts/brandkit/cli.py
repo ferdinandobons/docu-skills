@@ -23,7 +23,7 @@ from brandkit.qa.gate import run_qa
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="template-dna")
+    parser = argparse.ArgumentParser(prog="office-skills")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("extract")

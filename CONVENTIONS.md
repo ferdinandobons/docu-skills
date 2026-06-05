@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: MIT -->
-# template-dna — Frozen Conventions
+# office-skills — Frozen Conventions
 
-This is the **single source of truth** for the vocabulary of `template-dna`. It is
+This is the **single source of truth** for the vocabulary of `office-skills`. It is
 owned by `scripts/brandkit/profile/schema.py`; this document is its human-readable
 mirror. Every `SKILL.md`, command, and reference doc quotes these names **verbatim**.
 If a name here disagrees with code, the code (the schema module) wins and this file
@@ -37,7 +37,7 @@ root (the directory containing `.claude-plugin/`):
 python scripts/brandkit/cli.py extract --name <brand> --template <t>
 ```
 
-Set `TEMPLATE_DNA_ROOT` to the plugin root to invoke the CLI from any working
+Set `OFFICE_SKILLS_ROOT` to the plugin root to invoke the CLI from any working
 directory (the skill `cli.py` shims honor it; if unset they walk up to the nearest
 `.claude-plugin/`). `${CLAUDE_PLUGIN_ROOT}` never appears in author-facing SKILL.md.
 
@@ -96,7 +96,7 @@ These constants and enums are defined in `schema.py`. Do not invent synonyms.
   The 1.1.0 minor bump is **additive**: the optional `structure` section and the
   optional per-role `usage` object (see §12). 1.0.0 profiles lacking either stay
   valid — `validate()` never rejects a profile for missing them.
-- `$schema` id: `https://template-dna/schema/profile-1.json` (`SCHEMA_ID`).
+- `$schema` id: `https://office-skills/schema/profile-1.json` (`SCHEMA_ID`).
 
 ### Role registry
 - **`roles`** — the join table from semantic role id → concrete resolver descriptor.
@@ -377,7 +377,7 @@ role's usage so a reader sees what to respect in order vs use on demand.
 
 ## 12. Licensing
 
-- template-dna original code: **MIT** (every engine file carries an
+- office-skills original code: **MIT** (every engine file carries an
   `SPDX-License-Identifier: MIT` header).
 - Third-party proprietary Office helper scripts: **never vendored** — the OOXML
   engine is re-implemented from scratch (CI guard `tests/test_no_proprietary.py`).

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/hero.svg" alt="TemplateDNA — learn a company's template once, generate on-brand Word, PowerPoint and Excel forever" width="100%" />
+<img src="assets/hero.svg" alt="OfficeSkills — learn a company's template once, generate on-brand Word, PowerPoint and Excel forever" width="100%" />
 
 <br/>
 
@@ -15,9 +15,9 @@
 
 ---
 
-## What is TemplateDNA?
+## What is OfficeSkills?
 
-`TemplateDNA` is an **agent-skill bundle** (for Claude Code, Codex, and compatible AI agents) that turns a company's existing Office template into a **reusable brand memory**, then writes new documents that stay faithful to it.
+`OfficeSkills` is an **agent-skill bundle** (for Claude Code, Codex, and compatible AI agents) that turns a company's existing Office template into a **reusable brand memory**, then writes new documents that stay faithful to it.
 
 You give it one branded `.docx`, `.pptx`, or `.xlsx`. It **extracts** the brand — colors, fonts, named styles, layouts, cover anchors, the document's *structure*, logos, tables — into a portable **Brand Profile**. From then on, every document it **generates** is built *from the original template shell* and uses *only* the artifacts the template actually defines.
 
@@ -25,9 +25,9 @@ You give it one branded `.docx`, `.pptx`, or `.xlsx`. It **extracts** the brand 
 
 ### Why not just ask an AI to "use this template"?
 
-General-purpose document skills generate *freely* and only loosely imitate a reference file — fonts drift, the palette wanders, the corporate structure is lost. `TemplateDNA` is the opposite: narrow and faithful. It learns the template as a set of **rules and reusable parts**, remembers them in a `brand-kit/`, and **respects them** across an unlimited number of documents.
+General-purpose document skills generate *freely* and only loosely imitate a reference file — fonts drift, the palette wanders, the corporate structure is lost. `OfficeSkills` is the opposite: narrow and faithful. It learns the template as a set of **rules and reusable parts**, remembers them in a `brand-kit/`, and **respects them** across an unlimited number of documents.
 
-|  | General-purpose Office skills | **TemplateDNA** |
+|  | General-purpose Office skills | **OfficeSkills** |
 |---|---|---|
 | Mental model | "create a nice document" | "fill the company's template" |
 | Brand fidelity | best-effort imitation | **by construction** (opens from the shell, uses only its styles) |
@@ -69,8 +69,8 @@ All three expose the same three verbs: **`extract` → `verify` → `generate`**
   `python-docx>=1.1`, `python-pptx>=1.0`, `openpyxl>=3.1`, `lxml>=5.0`, `Pillow>=10.0`
 
 ```bash
-git clone https://github.com/ferdinandobons/template-dna.git
-cd template-dna
+git clone https://github.com/ferdinandobons/office-skills.git
+cd office-skills
 python3 -m venv .venv && . .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
@@ -106,17 +106,17 @@ python scripts/brandkit/cli.py doctor
 **Claude Code** (loads all three skills + the shared engine together):
 
 ```text
-/plugin marketplace add ferdinandobons/template-dna
-/plugin install template-dna
+/plugin marketplace add ferdinandobons/office-skills
+/plugin install office-skills
 ```
 
 **Codex** (clone + symlink the skills):
 
 ```bash
-git clone https://github.com/ferdinandobons/template-dna.git ~/.codex/template-dna
-cd ~/.codex/template-dna && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+git clone https://github.com/ferdinandobons/office-skills.git ~/.codex/office-skills
+cd ~/.codex/office-skills && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 mkdir -p ~/.codex/skills
-for s in brand-docx brand-pptx brand-xlsx; do ln -s ~/.codex/template-dna/skills/$s ~/.codex/skills/$s; done
+for s in brand-docx brand-pptx brand-xlsx; do ln -s ~/.codex/office-skills/skills/$s ~/.codex/skills/$s; done
 ```
 
 > Restart/reload the agent after installing if the skills don't appear immediately.

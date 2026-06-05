@@ -1,4 +1,4 @@
-# template-dna runtime dependencies (the contract; doctor.py checks these at runtime).
+# office-skills runtime dependencies (the contract; doctor.py checks these at runtime).
 # External binaries (soffice/libreoffice, pdftoppm) are NOT pip-installable and are
 # probed by doctor.py — their absence degrades visual QA (L1/L2) but never blocks L0.
 python-docx>=1.1

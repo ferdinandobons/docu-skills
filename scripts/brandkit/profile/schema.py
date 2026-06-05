@@ -34,7 +34,7 @@ from typing import Any, Optional
 # Pinned schema version (semver). Bump MINOR for additive, MAJOR for breaking.
 # ---------------------------------------------------------------------------
 SCHEMA_VERSION: str = "1.1.0"
-SCHEMA_ID: str = "https://template-dna/schema/profile-1.json"
+SCHEMA_ID: str = "https://office-skills/schema/profile-1.json"
 
 
 # ---------------------------------------------------------------------------

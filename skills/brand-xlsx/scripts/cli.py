@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def _root(start: Path) -> Path:
-    env_root = os.environ.get("TEMPLATE_DNA_ROOT")
+    env_root = os.environ.get("OFFICE_SKILLS_ROOT")
     if env_root:
         root = Path(env_root).expanduser().resolve()
         if (root / "scripts" / "brandkit").is_dir():
