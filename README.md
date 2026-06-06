@@ -22,7 +22,9 @@
 - [Why not just ask an AI to "use this template"?](#why-not-just-ask-an-ai-to-use-this-template)
 - [Highlights](#highlights)
 - [How it works](#how-it-works)
+- [Full plugin workflow](#full-plugin-workflow)
 - [Structure-aware, not just style-aware](#structure-aware-not-just-style-aware)
+- [Reliability & repair loop](#reliability--repair-loop)
 - [The three skills](#the-three-skills)
 - [The Brand Kit](#the-brand-kit)
 - [Prerequisites & installation](#prerequisites--installation)
@@ -61,6 +63,7 @@ General-purpose document skills generate *freely* and only loosely imitate a ref
 - 🧠 **Extract once, reuse forever** - a portable `brand-kit/<name>/` is the template's memory; every later document reads it. No re-explaining the brand.
 - 🏛️ **Structure-aware** - captures the template's *ordered skeleton* (e.g. **cover → table of contents → body**) and tags each component as a **fixed structure to keep in order** or a **style to use on demand**. ([details](#structure-aware-not-just-style-aware))
 - ✅ **Enforced, not just promised** - `verify` opens the shell and **fails** if a role resolves to a style/layout/named-range that doesn't exist. Deterministic checks also cover allowed styles, palette adherence, residual template text, broken tables, **formula preservation** (Excel), native-component survival and language rules.
+- 🧪 **Auditable generation** - `doctor` preflights dependencies, `--qa fast|auto|deep` makes QA depth explicit, and `--qa deep` writes a visual manifest for render-based review and targeted repair.
 - 🧩 **One shared engine** - a single profile schema, resolver, OOXML layer and QA gate underpin all three formats. The Word vertical is the reference implementation; PowerPoint and Excel build on the same foundation.
 - 🗂️ **Full artifact catalog** - records OOXML parts, styles, media, layouts, formulas and named ranges, so an agent can reason about anything the template exposes - even artifacts it can't yet regenerate.
 - 🔓 **Self-contained & MIT** - pure `python-docx` / `python-pptx` / `openpyxl` + OOXML. No cloud, no external services, no vendor lock-in.
@@ -85,7 +88,16 @@ General-purpose document skills generate *freely* and only loosely imitate a ref
 
 1. **Extract** unpacks the template's OOXML and records its brand: theme, named styles mapped to semantic **roles**, the **document structure** (the ordered skeleton plus which parts are fixed vs free), layouts, cover anchors, logos, and a complete artifact catalog. The original file is kept **byte-for-byte** as the *shell*.
 2. **Generate** turns your content into an **IntermediateDocument** of brand-agnostic typed blocks (heading, paragraph, callout, list, table, …). A **pure resolver** maps each block to the concrete brand artifact from the profile, fills the shell **in the template's structural order**, and saves.
-3. **Verify / QA** runs deterministic checks - every role resolves to a real artifact, only allowed styles are used, the palette holds, no residual template text remains, tables are intact, **Excel formulas survive every region fill** - and, when LibreOffice is available, a visual pass.
+3. **Verify / QA** runs deterministic checks - every role resolves to a real artifact, only allowed styles are used, the palette holds, no residual template text remains, tables are intact, **Excel formulas survive every region fill** - and, when LibreOffice is available, a render-based visual pass. When renderers are unavailable, the audit degrades explicitly instead of pretending visual proof happened.
+
+---
+
+## Full plugin workflow
+
+The end-to-end agent workflow is documented in
+[`docs/PLUGIN_WORKFLOW.md`](docs/PLUGIN_WORKFLOW.md). It covers skill selection,
+`doctor` preflight, extract/comprehend/generate/QA, visual manifests, autonomous
+repair rounds, and the final clean-output criteria.
 
 ---
 
@@ -97,6 +109,36 @@ Most "use my template" tools copy *styling*. BrandDocs also learns the template'
 - **Freeform** parts (headings, callouts, lists, tables, quotes, captions) are styles to **use on demand**, in whatever order your content needs.
 
 So a generated report opens with the company cover, keeps a live table of contents, and fills **only the body** with your content - exactly like a person starting from the corporate template, rather than a bare wall of text.
+
+---
+
+## Reliability & repair loop
+
+BrandDocs is designed so reliability is visible, testable, and improvable. The
+agent should not just produce a file; it should know which guarantees were
+proven, which were degraded, and what to repair next.
+
+| Layer | What it proves | What happens on failure |
+|---|---|---|
+| **Preflight** | `doctor` checks required Python packages and optional renderers (`soffice`, `pdftoppm`) before work starts. | Missing required packages must be installed/repaired. Missing visual renderers downgrade only the visual proof. |
+| **L0 deterministic QA** | Schema validity, resolver targets, allowed styles/layouts/ranges, residual demo text, markdown leaks, structural diffs, formula preservation. | The gate fails or emits explicit findings before the output is treated as clean. |
+| **L1 visual proxies** | Rendered-page signals such as blank pages, zero pages, and content near page/slide edges. | Findings are warnings because the engine can detect symptoms, not intent. |
+| **L2 visual judgement** | The orchestrator opens the PNGs from `visual_manifest.json`, judges checklist items, and decides whether the result is visually acceptable. | Apply a targeted repair, regenerate, and rerun `--qa deep` until clean or honestly blocked. |
+
+The template is treated as a source of reusable brand affordances, not a script
+to preserve blindly. If an inherited section break, slide scaffold, print area,
+field cache, or named-region geometry creates blank pages, stale entries,
+overlap, or clipped output, the right move is to diagnose the cause and make the
+smallest targeted composition change. Preserving a broken structure is less
+important than producing a clean branded document.
+
+The most valuable next reliability improvements are:
+
+1. **Strict visual mode** - add a future `--qa strict` that fails when full render proof is unavailable or when L1/L2 checks are not clean.
+2. **Native PPTX object authoring** - generate real PowerPoint tables/charts instead of down-rendering them to text, while keeping component-survival warnings.
+3. **Richer visual analysis** - add `PyMuPDF` as a PDF raster fallback/cross-check, then optional `numpy`/`opencv-python` or `scikit-image` for overlap, clipping, and large-empty-region detection.
+4. **Optional OCR** - detect visible stale placeholders, stale TOC caches, or demo text that OOXML text scans miss.
+5. **Skill eval set** - maintain template-based regression prompts for DOCX/PPTX/XLSX and compare outputs with and without the skill, measuring residual demo text, formula survival, component survival, page count, and visual warnings.
 
 ---
 
@@ -245,8 +287,9 @@ PowerPoint uses the same `IntermediateDocument`; Excel uses a `GridDocument` (na
 | Deterministic QA (L0: styles, palette, residual text, tables, formula preservation, language) | ✅ working |
 | `brand-pptx` - roles from real layouts, basic generation | 🚧 early |
 | `brand-xlsx` - named-region fills, formula-preserving | 🚧 early |
-| Visual QA (LibreOffice render + auto-repair loop) | 🔭 planned |
-| Charts / SmartArt / multi-page section templates | 🔭 catalogued, regeneration staged |
+| Visual QA (LibreOffice render + manifest-driven repair loop) | 🚧 implemented with graceful degraded mode |
+| Native PPTX charts / SmartArt / richer component regeneration | 🔭 catalogued, regeneration staged |
+| Strict visual mode, OCR, PyMuPDF / richer image analysis | 🔭 planned |
 
 Visual Word overflow needs LibreOffice, since Word lays out at render time.
 
