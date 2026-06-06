@@ -1073,8 +1073,39 @@ def refresh_visible_outline_toc_cache(doc, headings: list[tuple[int, str]]) -> i
 
 
 def _outline_toc_instruction(el) -> Optional[str]:
-    for instr in el.iter(w("instrText")):
-        text = (instr.text or "").strip()
+    """Return the full instruction of an outline ``TOC`` field inside ``el``, or None.
+
+    Word routinely splits a single field instruction across several consecutive
+    ``w:instrText`` runs (e.g. ``TOC \\o `` + ``"1-3" \\h \\z \\u``), so each run
+    must be concatenated PER ENCLOSING FIELD before classifying -- the same
+    ``fldChar`` begin/end stack walk ``_toc_field_begins`` uses. Inspecting a
+    single ``instrText`` node in isolation truncates the field code (losing the
+    ``\\o`` range and switches) and can misread a split caption index
+    (``TOC \\c "<seq>"`` whose ``\\c`` landed in a later run) as an outline TOC.
+
+    The stack attributes each ``instrText`` to its innermost open field, so a
+    nested field inside a rendered TOC entry (e.g. a ``PAGEREF``) accumulates into
+    its own frame and never pollutes the outer TOC instruction. A field whose
+    ``begin`` sits in ``el`` but whose ``end`` lives in a later body child (a
+    multi-paragraph TOC result) leaves an open frame whose instruction is still
+    complete, because ``instrText`` always precedes the ``separate`` fldChar.
+    """
+    stack: list[str] = []
+    candidates: list[str] = []
+    for node in el.iter(w("fldChar"), w("instrText")):
+        ln = _local_name(node.tag)
+        if ln == "fldChar":
+            ctype = node.get(w("fldCharType"))
+            if ctype == "begin":
+                stack.append("")
+            elif ctype == "end" and stack:
+                candidates.append(stack.pop())
+        elif ln == "instrText" and stack:
+            stack[-1] += node.text or ""
+    # Outermost-first for any field still open (end in a later body child).
+    candidates.extend(stack)
+    for instr in candidates:
+        text = instr.strip()
         if text.startswith(TOC_INSTR_PREFIX) and _toc_seq_id(text) is None:
             return text
     return None

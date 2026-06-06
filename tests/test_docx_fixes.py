@@ -66,6 +66,34 @@ def _add_toc_field(doc, instr='TOC \\o "1-3" \\h \\z \\u'):
     return p
 
 
+def _add_toc_field_split(doc, instr_parts):
+    """A TOC field whose instruction is split across several ``instrText`` runs.
+
+    Mirrors how Word emits field codes (the ``\\o`` switch and its argument can
+    land in different runs), with a nested PAGEREF field inside the result.
+    """
+    p = doc.add_paragraph()
+    r = p.add_run()
+    fb = OxmlElement("w:fldChar"); fb.set(qn("w:fldCharType"), "begin"); r._r.append(fb)
+    for part in instr_parts:
+        rp = p.add_run()
+        it = OxmlElement("w:instrText"); it.text = part; rp._r.append(it)
+    r3 = p.add_run()
+    fs = OxmlElement("w:fldChar"); fs.set(qn("w:fldCharType"), "separate"); r3._r.append(fs)
+    # nested PAGEREF field inside a rendered entry - its instrText must not leak
+    # into the outer TOC instruction.
+    rb = p.add_run()
+    pb = OxmlElement("w:fldChar"); pb.set(qn("w:fldCharType"), "begin"); rb._r.append(pb)
+    rb2 = p.add_run()
+    pit = OxmlElement("w:instrText"); pit.text = "PAGEREF _Toc1 \\h"; rb2._r.append(pit)
+    rb3 = p.add_run()
+    pe = OxmlElement("w:fldChar"); pe.set(qn("w:fldCharType"), "end"); rb3._r.append(pe)
+    p.add_run("entry .... 1")
+    r6 = p.add_run()
+    fe = OxmlElement("w:fldChar"); fe.set(qn("w:fldCharType"), "end"); r6._r.append(fe)
+    return p
+
+
 def _append_intermediate_sectpr(doc):
     """Append a paragraph carrying an intermediate w:pPr/w:sectPr (a section break)."""
     p = doc.add_paragraph()
@@ -223,6 +251,49 @@ class RefreshTocTest(unittest.TestCase):
         self.assertIn("New Real Section", toc_text)
         self.assertIn("Nested Real Topic", toc_text)
         self.assertNotIn("entry .... 1", toc_text)
+
+    def test_split_instrtext_outline_toc_preserves_full_field_code(self):
+        # Word splits the field instruction across consecutive instrText runs;
+        # the rewritten field must carry the COMPLETE code, not just 'TOC \o',
+        # and must not absorb the nested PAGEREF instruction.
+        doc = Document()
+        doc.add_paragraph("{{title}}", style="Title")
+        _add_toc_field_split(doc, ['TOC \\o ', '"1-3" \\h \\z \\u'])
+        doc.add_paragraph("Old Template Body", style="Heading 1")
+
+        rewritten = structure.refresh_visible_outline_toc_cache(
+            doc, [(1, "New Real Section")],
+        )
+        self.assertEqual(rewritten, 1)
+
+        toc_instr = "".join(
+            it.text or ""
+            for it in doc.element.body.iter(w("instrText"))
+            if (it.text or "").strip().startswith("TOC")
+        )
+        self.assertIn('\\o "1-3"', toc_instr)  # full range preserved
+        self.assertIn("\\h", toc_instr)
+        self.assertIn("\\z", toc_instr)
+        self.assertNotIn("PAGEREF", toc_instr)  # nested field not over-captured
+        toc_text = "\n".join(
+            "".join(t.text or "" for t in list(doc.element.body)[c["index"]].iter(w("t")))
+            for c in structure.classify_body_children(doc)
+            if c["region"] == "toc"
+        )
+        self.assertIn("New Real Section", toc_text)
+
+    def test_split_caption_index_is_not_rewritten_as_outline_toc(self):
+        # A caption index whose \c switch lands in a later instrText run must be
+        # left for Word to recompute, not overwritten with outline headings.
+        doc = Document()
+        doc.add_paragraph("{{title}}", style="Title")
+        _add_toc_field_split(doc, ['TOC \\h ', '\\c "Figura"'])
+        doc.add_paragraph("Old Template Body", style="Heading 1")
+
+        rewritten = structure.refresh_visible_outline_toc_cache(
+            doc, [(1, "New Real Section")],
+        )
+        self.assertEqual(rewritten, 0)
 
 
 # ---------------------------------------------------------------------------
