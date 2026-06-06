@@ -814,9 +814,18 @@ class GateWiringTest(unittest.TestCase):
     def test_render_to_pngs_can_skip_availability_recheck(self) -> None:
         orig_available = vqa.renderers_available
         orig_run = subprocess.run
+        orig_which = vqa.shutil.which
 
         def boom_available():  # pragma: no cover - must not be called
             raise AssertionError("availability already checked by gate")
+
+        # Force the pdftoppm rasterization branch regardless of host: on CI
+        # (Ubuntu) the binary is absent, so without this stub shutil.which
+        # returns None and render_to_pngs falls through to the quicklook path.
+        def fake_which(name):
+            if name == "pdftoppm":
+                return "/fake/pdftoppm"
+            return orig_which(name)
 
         def fake_run(args, *unused_args, **unused_kwargs):
             if "--convert-to" in args:
@@ -831,6 +840,7 @@ class GateWiringTest(unittest.TestCase):
             return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
 
         vqa.renderers_available = boom_available
+        vqa.shutil.which = fake_which
         subprocess.run = fake_run
         try:
             with tempfile.TemporaryDirectory() as td:
@@ -844,6 +854,7 @@ class GateWiringTest(unittest.TestCase):
             self.assertEqual([p.name for p in pngs], ["page-1.png"])
         finally:
             vqa.renderers_available = orig_available
+            vqa.shutil.which = orig_which
             subprocess.run = orig_run
 
     def test_render_to_pngs_falls_back_to_quicklook_thumbnail(self) -> None:
