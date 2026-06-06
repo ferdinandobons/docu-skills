@@ -1,0 +1,51 @@
+name: 🐛 Bug report
+description: Report a problem with extract, generate, verify or QA
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug! Please **never attach real company templates**
+        — reproduce with a synthetic `.docx` / `.pptx` / `.xlsx` instead.
+  - type: dropdown
+    id: skill
+    attributes:
+      label: Which skill?
+      options:
+        - brand-docx (Word)
+        - brand-pptx (PowerPoint)
+        - brand-xlsx (Excel)
+        - shared engine / CLI
+        - not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact CLI command or agent prompt you used.
+      placeholder: |
+        1. python scripts/brandkit/cli.py extract --name demo --template synthetic.docx ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Environment (`doctor` output)
+      description: Paste the output of `python scripts/brandkit/cli.py doctor`.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: BrandDocs version / commit
+    validations:
+      required: false

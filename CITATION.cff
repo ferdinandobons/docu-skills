@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+title: >-
+  BrandDocs — turn a company's Word, PowerPoint or Excel
+  template into unlimited on-brand documents
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Ferdinando
+    family-names: Bonsegna
+repository-code: 'https://github.com/ferdinandobons/brand-docs'
+url: 'https://github.com/ferdinandobons/brand-docs'
+abstract: >-
+  BrandDocs is an open-source agent-skill bundle for Claude Code, Codex and
+  compatible AI agents. It extracts a company's Office template (.docx, .pptx,
+  .xlsx) into a reusable Brand Profile, then generates new on-brand documents
+  from the original template shell. Off-brand output is impossible by
+  construction: generators never write literal style names, colors or fonts,
+  and verification fails on any artifact the template does not define.
+keywords:
+  - claude-code
+  - claude-skill
+  - ai-agents
+  - brand-identity
+  - document-generation
+  - docx
+  - pptx
+  - xlsx
+  - ooxml
+  - office-automation
+  - python-docx
+  - python-pptx
+  - openpyxl
+license: MIT
+version: 0.1.0
+date-released: '2026-06-06'

@@ -4,6 +4,6 @@
   "version": "0.1.0",
   "author": { "name": "Ferdinando Bonsegna" },
   "license": "MIT",
-  "keywords": ["brand", "template", "docx", "pptx", "xlsx", "ooxml", "brand-kit", "claude-code", "agent-skill"],
+  "keywords": ["brand", "branding", "brand-identity", "brand-guidelines", "template", "office-template", "document-generation", "document-automation", "office-automation", "docx", "pptx", "xlsx", "word", "powerpoint", "excel", "ooxml", "python-docx", "python-pptx", "openpyxl", "brand-kit", "claude", "claude-code", "claude-skill", "anthropic", "ai-agents", "agent-skill", "codex", "llm-tools"],
   "skills": ["./skills/brand-docx", "./skills/brand-pptx", "./skills/brand-xlsx"]
 }
