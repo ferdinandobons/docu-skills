@@ -1,10 +1,12 @@
 <div align="center">
 
-<img src="assets/hero.png" alt="BrandDocs - extract a company's Word, PowerPoint or Excel template into a reusable Brand Profile, then generate unlimited on-brand documents of that same format" width="100%" />
+<img src="assets/hero.png" alt="BrandDocs — AI on-brand document generator that turns a company's Word, PowerPoint or Excel template into a reusable Brand Profile and generates unlimited on-brand .docx, .pptx and .xlsx documents" width="100%" />
 
 <br/>
 
-**Turn a company's Word, PowerPoint or Excel template into unlimited on-brand documents of the same type.**
+# BrandDocs — AI On-Brand Document Generator for Word, PowerPoint & Excel
+
+**Turn your company's Word, PowerPoint or Excel template into unlimited on-brand documents.** A [Claude Code](https://www.anthropic.com/claude-code) & Codex skill that extracts a reusable **Brand Profile** once and generates faithful **`.docx`, `.pptx` and `.xlsx`** forever — off-brand output impossible by construction.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
@@ -342,7 +344,7 @@ Everything runs locally. `brand-kit/` and `generated/` are git-ignored, and a te
 **Can it preserve Excel formulas and the template's structure?**
 Yes. Excel generation fills named cells and regions while **preserving formulas**, and Word/PowerPoint generation keeps the template's ordered skeleton (cover → table of contents → body). See [Structure-aware](#structure-aware-not-just-style-aware).
 
-**Keywords:** Claude Code skill · AI agent skill · on-brand document generation · brand template automation · corporate template to document · docx / pptx / xlsx generator · Office automation · OOXML · python-docx · python-pptx · openpyxl · brand profile · brand kit · document automation.
+**Keywords:** AI document generator · on-brand document generation · template to document · Claude Code skill · Codex skill · AI agent skill · brand template automation · corporate template to document · docx / pptx / xlsx generator · Word / PowerPoint / Excel automation · Office automation · OOXML · python-docx · python-pptx · openpyxl · brand profile · brand kit · document automation.
 
 ---
 
