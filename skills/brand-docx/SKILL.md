@@ -67,9 +67,9 @@ Use its output to decide the run mode:
 - If optional OCR (`tesseract`) is missing, the visual audit can still run, but
   rendered residual-text proof is incomplete. Report that limitation when
   judging stale placeholders or field caches.
-- For `--qa deep`, prefer repairing/installing renderers before generation. If
-  the environment cannot run them, generate a degraded manifest and state clearly
-  that the L2 visual proof is incomplete.
+- For `--qa deep` or `--qa strict`, prefer repairing/installing renderers before
+  generation. If the environment cannot run them, `deep` generates a degraded
+  manifest and `strict` fails with a visual proof blocker.
 
 ## Agent Workflow
 
@@ -114,8 +114,9 @@ python scripts/brandkit/cli.py verify --name <brand> --scope auto --qa auto
 - `fast` — deterministic **L0** only (schema, resolver targets, residual text, structural diffs).
 - `auto` — L0 **+ L1** visual pixel proxies when renderers (`soffice` plus `pdftoppm` or optional PyMuPDF/`fitz`) are present; otherwise L0 plus a single INFO `visual.unavailable`.
 - `deep` — L0 + L1 **+ a `visual_manifest.json`** and per-page PNGs; if `tesseract` is installed the manifest also includes OCR text/hits. The orchestrator must then run the **L2** step (see below).
+- `strict` — deep visual audit plus gate errors when full render proof is unavailable or L1/OCR evidence is not clean.
 
-Verify has no output to render, so all three modes behave as L0 at verify time; the visual stages run at **generate** time.
+Verify has no output to render, so all modes behave as L0 at verify time; the visual stages run at **generate** time.
 
 ## Internal Generate
 
@@ -157,7 +158,8 @@ field-result caches, or other template structures create blank pages, stale
 entries, overlaps, or visibly broken pagination, diagnose the structure as the
 cause and make the smallest targeted composition change. It is acceptable to
 collapse, move, or remove a template section break when preserving it damages the
-final generated document. After every repair, regenerate and rerun `--qa deep`.
+final generated document. After every repair, regenerate and rerun `--qa deep` or
+`--qa strict`.
 
 ## Current Guarantees and Limits
 

@@ -4,9 +4,9 @@
 The L1 proxy tests feed SYNTHETIC PIL images (blank page, edge bleed, centered
 content, landscape) so they assert the deterministic pixel proxies without ever
 invoking ``soffice``. The wiring/degrade tests monkeypatch the renderer so the
-gate's ``--qa fast|auto|deep`` semantics and the clean CI degrade are proven
-without external tools. One gated end-to-end test runs the real render when the
-binaries are present (skipped in CI).
+gate's ``--qa fast|auto|deep|strict`` semantics and the clean CI degrade are
+proven without external tools. One gated end-to-end test runs the real render
+when the binaries are present (skipped in CI).
 """
 from __future__ import annotations
 
@@ -775,6 +775,72 @@ class GateWiringTest(unittest.TestCase):
         finally:
             vqa.renderers_available = orig_available
             vqa.render_to_pngs = orig_render
+
+    def test_run_qa_strict_fails_when_renderers_unavailable(self) -> None:
+        orig_available = vqa.renderers_available
+        vqa.renderers_available = lambda: False
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                td = Path(td)
+                target = td / "out.docx"
+                out_dir = td / "out.visual"
+                _real_docx(target)
+                report = gate.run_qa(
+                    target,
+                    _minimal_profile(),
+                    qa="strict",
+                    out_dir=out_dir,
+                )
+                manifest = [f for f in report.findings if f.check == "visual.manifest"]
+                self.assertEqual(len(manifest), 1)
+                data = json.loads(Path(manifest[0].location).read_text(encoding="utf-8"))
+        finally:
+            vqa.renderers_available = orig_available
+
+        self.assertFalse(report.passed)
+        self.assertTrue(any(f.check == "visual.strict_unavailable" for f in report.findings))
+        self.assertTrue(data["degraded"])
+        self.assertEqual(data["qa_mode"], "strict")
+
+    def test_run_qa_strict_promotes_l1_findings_to_errors(self) -> None:
+        orig_ocr = vqa.run_visual_ocr
+        try:
+            vqa.run_visual_ocr = lambda *args, **kwargs: {
+                "engine": "tesseract",
+                "available": False,
+                "status": "unavailable",
+                "terms_checked": [],
+                "pages": [],
+                "hits": [],
+                "errors": [],
+                "reason": "test",
+            }
+            with tempfile.TemporaryDirectory() as td:
+                td = Path(td)
+                target = td / "out.docx"
+                out_dir = td / "out.visual"
+                _real_docx(target)
+                out_dir.mkdir(parents=True, exist_ok=True)
+                png = out_dir / "page-1.png"
+                _blank().save(png)
+                report = gate.run_qa(
+                    target,
+                    _minimal_profile(),
+                    qa="strict",
+                    out_dir=out_dir,
+                    visual=(True, [png]),
+                )
+                manifest = [f for f in report.findings if f.check == "visual.manifest"]
+                data = json.loads(Path(manifest[0].location).read_text(encoding="utf-8"))
+        finally:
+            vqa.run_visual_ocr = orig_ocr
+
+        self.assertFalse(report.passed)
+        self.assertTrue(any(f.check == "visual.blank_page" for f in report.findings))
+        strict = [f for f in report.findings if f.check == "visual.strict"]
+        self.assertTrue(strict)
+        self.assertTrue(any("visual.blank_page" in f.message for f in strict))
+        self.assertEqual(data["qa_mode"], "strict")
 
     def test_run_qa_deep_surfaces_ocr_hits_in_manifest(self) -> None:
         orig_ocr = vqa.run_visual_ocr

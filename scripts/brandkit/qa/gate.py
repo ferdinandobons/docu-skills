@@ -3,7 +3,7 @@
 
 L0 implements deterministic byte/structure checks. On top of it a two-stage
 visual audit runs *only* when the external renderers are installed and the QA
-mode asks for it (``auto``/``deep``):
+mode asks for it (``auto``/``deep``/``strict``):
 
   * **L1** = deterministic pixel proxies on the rendered PNGs (blank pages, edge
     bleed); each defect is a WARNING ``Finding`` (never ERROR -> never changes a
@@ -15,8 +15,10 @@ mode asks for it (``auto``/``deep``):
 Backward-compat: ``fast`` and ``target is None`` never touch the visual path;
 when renderers are absent (CI) ``auto`` degrades to L0 plus a single INFO
 ``visual.unavailable`` finding; ``deep`` also writes a degraded manifest so the
-orchestrator still has the L2 checklist. The PNGs and manifest are SIDE artifacts
-in an out dir next to the output; the generated document's bytes never change.
+orchestrator still has the L2 checklist. ``strict`` writes the same manifest but
+fails when full visual proof is unavailable or L1/OCR findings are present. The
+PNGs and manifest are SIDE artifacts in an out dir next to the output; the
+generated document's bytes never change.
 """
 from __future__ import annotations
 
@@ -54,11 +56,12 @@ def run_qa(
         out_dir: where to write the visual side artifacts (PNGs + manifest). When
             None a conventional ``<output-filename>.visual`` dir next to
             ``target`` is used (for example ``out.docx.visual``).
-            Only consulted on the ``auto``/``deep`` path with renderers present.
+            Only consulted on the ``auto``/``deep``/``strict`` path with renderers
+            present.
         visual: a pre-rendered ``(renderers_ok, png_paths)`` tuple injected by
-            tests to drive the ``auto``/``deep`` path without ``soffice``. When
-            None the real env-aware renderer is used. Default None keeps every
-            existing call identical.
+            tests to drive the visual path without ``soffice``. When None the
+            real env-aware renderer is used. Default None keeps every existing
+            call identical.
     """
     findings = checks_deterministic.check_profile(profile)
     # The per-format checks also receive the brand ``shell`` so they can run the
@@ -112,12 +115,15 @@ def _run_visual_audit(
       * ``fast`` or ``target is None`` -> no visual path at all (``[]``). This is
         the pillar of backward-compat: every smoke test uses ``--qa fast`` and so
         never imports or touches the visual module.
-      * ``auto``/``deep`` with renderers ABSENT -> INFO ``visual.unavailable``;
-        ``deep`` additionally writes a degraded manifest with the checklist.
+      * ``auto``/``deep``/``strict`` with renderers ABSENT -> INFO
+        ``visual.unavailable``; ``deep`` additionally writes a degraded manifest
+        with the checklist; ``strict`` writes the manifest and adds an ERROR.
       * ``auto`` with renderers present -> L0 + L1 pixel proxies.
       * ``deep`` with renderers present -> L0 + L1 + a written manifest, signalled
         back via an INFO ``visual.manifest`` carrying the manifest path so the
         orchestrator can run the L2 step.
+      * ``strict`` with renderers present -> ``deep`` plus ERROR findings when
+        render/L1/OCR evidence is not clean.
 
     The visual module is imported lazily so the fast/CI path never imports it and
     an import-time environment problem cannot touch the L0 path.
@@ -143,32 +149,39 @@ def _run_visual_audit(
             schema.Severity.INFO.value,
             "visual QA unavailable (soffice/pdftoppm absent); L0 only",
         )]
-        if qa == "deep":
+        if qa in ("deep", "strict"):
             render_errors: list[str] = []
             render_warnings: list[str] = []
-            png_paths = vqa.render_to_pngs(
-                target,
-                resolved_out,
-                check_available=False,
-                quicklook_only=True,
-                render_errors=render_errors,
-                render_warnings=render_warnings,
-            )
-            findings.extend(vqa.run_visual_l1(png_paths))
-            for warning in render_warnings:
+            if qa == "deep":
+                png_paths = vqa.render_to_pngs(
+                    target,
+                    resolved_out,
+                    check_available=False,
+                    quicklook_only=True,
+                    render_errors=render_errors,
+                    render_warnings=render_warnings,
+                )
+                findings.extend(vqa.run_visual_l1(png_paths))
+                for warning in render_warnings:
+                    findings.append(Finding(
+                        "visual.render_degraded",
+                        schema.Severity.WARNING.value,
+                        warning,
+                    ))
+                if not png_paths:
+                    detail = render_errors[-1] if render_errors else "renderer produced no pages"
+                    findings.append(Finding(
+                        "visual.render_failed",
+                        schema.Severity.WARNING.value,
+                        f"visual fallback render failed: {detail}",
+                    ))
+                    findings.extend(vqa.check_page_count_sane(png_paths))
+            else:
                 findings.append(Finding(
-                    "visual.render_degraded",
-                    schema.Severity.WARNING.value,
-                    warning,
+                    "visual.strict_unavailable",
+                    schema.Severity.ERROR.value,
+                    "strict visual QA requires full render proof, but renderers are unavailable",
                 ))
-            if not png_paths:
-                detail = render_errors[-1] if render_errors else "renderer produced no pages"
-                findings.append(Finding(
-                    "visual.render_failed",
-                    schema.Severity.WARNING.value,
-                    f"visual fallback render failed: {detail}",
-                ))
-                findings.extend(vqa.check_page_count_sane(png_paths))
             ocr_report = vqa.run_visual_ocr(png_paths, profile)
             findings.extend(vqa.ocr_findings(ocr_report))
             manifest = vqa.build_visual_manifest(
@@ -181,6 +194,7 @@ def _run_visual_audit(
                 degraded=True,
                 environment_status=vqa.last_renderer_status(),
                 ocr_report=ocr_report,
+                qa_mode=qa,
             )
             findings.append(Finding(
                 "visual.manifest",
@@ -218,10 +232,12 @@ def _run_visual_audit(
         ))
     findings.extend(vqa.check_page_count_sane(png_paths))
 
-    if qa == "deep":
+    if qa in ("deep", "strict"):
         manifest_renderers_ok = renderers_ok if visual is not None else bool(png_paths)
         ocr_report = vqa.run_visual_ocr(png_paths, profile)
         findings.extend(vqa.ocr_findings(ocr_report))
+        if qa == "strict":
+            findings.extend(_strict_visual_errors(findings))
         manifest = vqa.build_visual_manifest(
             profile=profile,
             document=target,
@@ -232,6 +248,7 @@ def _run_visual_audit(
             degraded=bool(render_warnings) or not manifest_renderers_ok,
             environment_status=vqa.last_renderer_status(),
             ocr_report=ocr_report,
+            qa_mode=qa,
         )
         findings.append(Finding(
             "visual.manifest",
@@ -240,3 +257,29 @@ def _run_visual_audit(
             location=str(manifest),
         ))
     return findings
+
+
+_STRICT_BLOCKING_CHECKS = {
+    "visual.blank_page",
+    "visual.edge_bleed",
+    "visual.no_pages",
+    "visual.render_degraded",
+    "visual.render_failed",
+    "visual.ocr_residual_text",
+    "visual.ocr_degraded",
+}
+
+
+def _strict_visual_errors(findings: list[Finding]) -> list[Finding]:
+    """Promote concrete visual-audit findings into strict-mode gate errors."""
+    errors: list[Finding] = []
+    for finding in findings:
+        if finding.check not in _STRICT_BLOCKING_CHECKS:
+            continue
+        errors.append(Finding(
+            "visual.strict",
+            schema.Severity.ERROR.value,
+            f"strict visual QA blocks on {finding.check}: {finding.message}",
+            location=finding.location,
+        ))
+    return errors

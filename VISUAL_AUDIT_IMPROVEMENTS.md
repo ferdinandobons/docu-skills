@@ -62,6 +62,8 @@ Expected behavior:
   exercising extract/optional-comprehend/verify/generate and checking residual
   text removal, native PPTX table survival, named-range fills, and formula
   preservation.
+- `--qa strict` now runs the deep visual path and fails the gate when full render
+  proof is unavailable or when L1/OCR findings indicate unclean visual evidence.
 
 ## Recommended improvements
 
@@ -203,8 +205,8 @@ Suggested policy:
 - `auto`: L0 plus visual render when the full pipeline is available.
 - `deep`: preflight first; prefer full render; if unavailable, produce degraded
   manifest and say exactly what is unproven.
-- future `strict`: fail if full render is unavailable or if L1/L2 checks are not
-  clean.
+- `strict`: fail if full render is unavailable or if L1/OCR findings are not
+  clean; still write the manifest for targeted repair.
 
 ### 8. Keep Playwright out of the Office core path
 

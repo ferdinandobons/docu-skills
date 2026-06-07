@@ -26,6 +26,7 @@ The bytes of the generated document never change because of the audit.
 | `fast` | L0 only | L0 only (identical) |
 | `auto` | L0 + L1 | L0 + one INFO `visual.unavailable` |
 | `deep` | L0 + L1 + **manifest** (INFO `visual.manifest` with the path) -> triggers your L2 step | L0 + INFO `visual.unavailable` + a **degraded manifest** with the checklist; on macOS a first-page Quick Look fallback may be included |
+| `strict` | L0 + L1 + OCR/manifest + ERROR `visual.strict` if render/L1/OCR evidence is unclean | L0 + degraded manifest + ERROR `visual.strict_unavailable` |
 
 Notes:
 - At **verify** time there is no output to render, so every mode behaves as L0.
@@ -33,6 +34,8 @@ Notes:
   code unchanged**. `auto` may create no `.visual` dir; `deep` writes a degraded
   `.visual/visual_manifest.json` so the orchestrator can still inspect what was
   skipped and which checklist items remain unproven.
+- `strict` is the release-quality mode: it writes the manifest like `deep`, but
+  fails when full render proof is unavailable or when L1/OCR findings need repair.
 - The renderer is env-detected via `doctor.probe()["visual_qa"]`, which
   smoke-tests the DOCX, PPTX, and XLSX render paths end to end; run
   `python scripts/brandkit/cli.py doctor` before starting the workflow and report
@@ -148,6 +151,8 @@ checklist is tailored to the template:
    repair the IntermediateDocument/content, regenerate, and re-run the audit.
 5. Repeat until the checklist is clean — **max 3 iterations** by default — then
    return the file with an honest QA summary.
+6. For release-quality validation, rerun with `--qa strict`; any `visual.strict`
+   ERROR identifies the exact visual finding that still needs targeted repair.
 
 The engine produces the evidence; the qualitative judgement and the decision to
 regenerate are yours.

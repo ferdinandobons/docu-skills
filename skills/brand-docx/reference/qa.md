@@ -18,6 +18,7 @@ QA mode asks for it:
   The engine never calls a model.
 
 It is gated by `--qa` (`fast` = L0 only; `auto` = L0 + L1; `deep` = L0 + L1 +
-manifest) and degrades gracefully when `soffice`/`pdftoppm` are absent (L0 plus a
-single INFO `visual.unavailable`, exit code unchanged). See
+manifest; `strict` = deep plus visual gate errors) and degrades gracefully when
+`soffice`/`pdftoppm` are absent in `auto`/`deep` (L0 plus INFO/WARNING findings).
+`strict` fails when full render proof is unavailable. See
 [visual-audit.md](visual-audit.md).

@@ -35,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("verify")
     p.add_argument("--name", required=True)
     p.add_argument("--scope", default="auto", choices=("auto", "project", "global"))
-    p.add_argument("--qa", default="auto", choices=("auto", "fast", "deep"))
+    p.add_argument("--qa", default="auto", choices=("auto", "fast", "deep", "strict"))
     p.add_argument("--accept", action="store_true")
 
     p = sub.add_parser("generate")
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--input", required=True)
     p.add_argument("--output", required=True)
     p.add_argument("--scope", default="auto", choices=("auto", "project", "global"))
-    p.add_argument("--qa", default="auto", choices=("auto", "fast", "deep"))
+    p.add_argument("--qa", default="auto", choices=("auto", "fast", "deep", "strict"))
 
     # comprehend-input: print the bounded {facts, excerpt} bundle the MODEL reads.
     p = sub.add_parser("comprehend-input")

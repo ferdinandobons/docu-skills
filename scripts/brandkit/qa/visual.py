@@ -887,6 +887,7 @@ def build_visual_manifest(
     degraded: bool | None = None,
     environment_status: dict | None = None,
     ocr_report: dict | None = None,
+    qa_mode: str = "deep",
 ) -> Path:
     """Build and write ``<out_dir>/visual_manifest.json`` (a SIDE artifact).
 
@@ -927,7 +928,7 @@ def build_visual_manifest(
         "profile_name": (profile.get("identity") or {}).get("name"),
         "document": document.name,
         "renderers_available": bool(renderers_ok),
-        "qa_mode": "deep",
+        "qa_mode": qa_mode,
         "dpi": DEFAULT_DPI,
         "pages": pages,
         "l1_findings": [

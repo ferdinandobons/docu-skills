@@ -66,7 +66,7 @@ General-purpose document skills generate *freely* and only loosely imitate a ref
 - 🧠 **Extract once, reuse forever** - a portable `brand-kit/<name>/` is the template's memory; every later document reads it. No re-explaining the brand.
 - 🏛️ **Structure-aware** - captures the template's *ordered skeleton* (e.g. **cover → table of contents → body**) and tags each component as a **fixed structure to keep in order** or a **style to use on demand**. ([details](#structure-aware-not-just-style-aware))
 - ✅ **Enforced, not just promised** - `verify` opens the shell and **fails** if a role resolves to a style/layout/named-range that doesn't exist. Deterministic checks also cover allowed styles, palette adherence, residual template text, broken tables, **formula preservation** (Excel), native-component survival and language rules.
-- 🧪 **Auditable generation** - `doctor` preflights dependencies, `--qa fast|auto|deep` makes QA depth explicit, and `--qa deep` writes a visual manifest for render-based review and targeted repair.
+- 🧪 **Auditable generation** - `doctor` preflights dependencies, `--qa fast|auto|deep|strict` makes QA depth explicit, and `--qa deep`/`strict` writes a visual manifest for render-based review and targeted repair.
 - 🧩 **One shared engine** - a single profile schema, resolver, OOXML layer and QA gate underpin all three formats. The Word vertical is the reference implementation; PowerPoint and Excel build on the same foundation.
 - 🗂️ **Full artifact catalog** - records OOXML parts, styles, media, layouts, formulas and named ranges, so an agent can reason about anything the template exposes - even artifacts it can't yet regenerate.
 - 🔓 **Self-contained & MIT** - pure `python-docx` / `python-pptx` / `openpyxl` + OOXML. No cloud, no external services, no vendor lock-in.
@@ -126,7 +126,7 @@ proven, which were degraded, and what to repair next.
 | **Preflight** | `doctor` checks required Python packages, optional renderers (`soffice`, `pdftoppm`, PyMuPDF/`fitz`), and optional OCR (`tesseract`) before work starts. | Missing required packages must be installed/repaired. Missing visual/OCR tools downgrade only that proof layer. |
 | **L0 deterministic QA** | Schema validity, resolver targets, allowed styles/layouts/ranges, residual demo text, markdown leaks, structural diffs, formula preservation. | The gate fails or emits explicit findings before the output is treated as clean. |
 | **L1 visual proxies** | Rendered-page signals such as blank pages, zero pages, content near page/slide edges, and optional OCR hits for visible residual template text. | Findings are warnings because the engine can detect symptoms, not intent. |
-| **L2 visual judgement** | The orchestrator opens the PNGs from `visual_manifest.json`, judges checklist items, and decides whether the result is visually acceptable. | Apply a targeted repair, regenerate, and rerun `--qa deep` until clean or honestly blocked. |
+| **L2 visual judgement** | The orchestrator opens the PNGs from `visual_manifest.json`, judges checklist items, and decides whether the result is visually acceptable. `strict` turns unclean visual evidence into gate errors. | Apply a targeted repair, regenerate, and rerun `--qa deep` or `--qa strict` until clean or honestly blocked. |
 
 The template is treated as a source of reusable brand affordances, not a script
 to preserve blindly. If an inherited section break, slide scaffold, print area,
@@ -137,10 +137,9 @@ important than producing a clean branded document.
 
 The most valuable next reliability improvements are:
 
-1. **Strict visual mode** - add a future `--qa strict` that fails when full render proof is unavailable or when L1/L2 checks are not clean.
-2. **Native PPTX object authoring** - continue beyond native tables into real PowerPoint charts/images/SmartArt instead of down-rendering them to text, while keeping component-survival warnings.
-3. **Richer visual analysis** - build on the PyMuPDF fallback with optional `numpy`/`opencv-python` or `scikit-image` for overlap, clipping, and large-empty-region detection.
-4. **Broader skill evals** - expand the current template-based eval set with more corporate templates, visual-repair traces, and with/without-skill comparisons.
+1. **Native PPTX object authoring** - continue beyond native tables into real PowerPoint charts/images/SmartArt instead of down-rendering them to text, while keeping component-survival warnings.
+2. **Richer visual analysis** - build on the PyMuPDF fallback with optional `numpy`/`opencv-python` or `scikit-image` for overlap, clipping, and large-empty-region detection.
+3. **Broader skill evals** - expand the current template-based eval set with more corporate templates, visual-repair traces, and with/without-skill comparisons.
 
 ---
 
@@ -301,7 +300,8 @@ PowerPoint uses the same `IntermediateDocument`; Excel uses a `GridDocument` (na
 | PyMuPDF PDF raster fallback | ✅ working |
 | Optional OCR rendered-text residual scan | ✅ working when Tesseract is installed |
 | Template-based skill eval set (DOCX/PPTX/XLSX) | ✅ working in CI |
-| Strict visual mode, richer image analysis | 🔭 planned |
+| Strict visual mode (`--qa strict`) | ✅ working |
+| Richer image analysis | 🔭 planned |
 
 Visual Word overflow needs LibreOffice, since Word lays out at render time.
 
