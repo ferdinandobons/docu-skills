@@ -21,7 +21,8 @@ OPTIONAL_PYTHON_INSTALL_HINTS = {
 }
 OPTIONAL_INSTALL_HINTS = {
     "soffice": (
-        "macOS: brew install --cask libreoffice-still; "
+        "macOS: brew install --cask libreoffice; "
+        "if installed but unusable, open LibreOffice once and approve any macOS security prompt; "
         "Debian/Ubuntu: sudo apt-get install -y libreoffice; "
         "Fedora: sudo dnf install -y libreoffice; "
         "Windows: winget install TheDocumentFoundation.LibreOffice"
