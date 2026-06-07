@@ -6,7 +6,7 @@
 
 # BrandDocs — AI On-Brand Document Generator for Word, PowerPoint & Excel
 
-**Turn your company's Word, PowerPoint or Excel template into unlimited on-brand documents.** A [Claude Code](https://www.anthropic.com/claude-code) & Codex skill that extracts a reusable **Brand Profile** once and generates faithful **`.docx`, `.pptx` and `.xlsx`** forever — off-brand output impossible by construction.
+**BrandDocs turns existing Word, PowerPoint and Excel templates into reusable AI document-generation skills.** Unlike generic AI document generators, it preserves **brand, structure, styles and formulas by construction**. It is built for [Claude Code](https://www.anthropic.com/claude-code), Codex and compatible AI agents.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
@@ -23,7 +23,9 @@
 ## Contents
 
 - [What is BrandDocs?](#what-is-branddocs)
+- [At a glance](#at-a-glance)
 - [Why not just ask an AI to "use this template"?](#why-not-just-ask-an-ai-to-use-this-template)
+- [Common use cases](#common-use-cases)
 - [Highlights](#highlights)
 - [How it works](#how-it-works)
 - [Full plugin workflow](#full-plugin-workflow)
@@ -44,13 +46,27 @@
 
 ## What is BrandDocs?
 
-**BrandDocs** is an **agent-skill bundle** - for Claude Code, Codex, and compatible AI agents - that turns a company's existing Office template into a **reusable brand memory**, then writes new documents that stay faithful to it.
+**BrandDocs** is an open-source **agent-skill bundle** that turns a company's existing Office templates into reusable AI document-generation skills.
 
-> **In one sentence:** make Claude (or any compatible agent) *repeatedly* generate Office documents - **DOCX, PPTX and XLSX** - from your company's existing templates, while letting the **content vary** freely and keeping the **brand fixed**.
+In practical terms: make Claude Code, Codex or another compatible agent repeatedly generate Office documents - **DOCX, PPTX and XLSX** - from your company's real templates, while letting the **content vary** freely and keeping the **brand fixed**.
 
 You give it one branded `.docx`, `.pptx`, or `.xlsx`. It **extracts** the brand - theme colors and fonts, named styles, the document's *structure*, layouts, cover anchors, logos and tables - into a portable **Brand Profile**. From then on, every document it **generates** is built *from the original template shell* and uses *only* the artifacts the template actually defines. Each format stays in its own lane: a Word template makes Word documents, a deck makes decks, a workbook makes workbooks - there is no cross-format conversion.
 
 > **The core guarantee: off-brand output is impossible by construction.** No generator ever writes a literal style name, hex color, or font - those live only in the Brand Profile, and `verify` refuses a profile that points at anything the template doesn't contain. There is no "creative" path that drifts from the brand.
+
+---
+
+## At a glance
+
+| Question | Answer |
+|---|---|
+| **Input** | Existing company `.docx`, `.pptx`, or `.xlsx` templates |
+| **Output** | Same-format on-brand Word documents, PowerPoint decks, and Excel workbooks |
+| **Works with** | Claude Code, Codex, compatible AI agents, or the direct Python CLI |
+| **Best for** | Repeatable reports, decks, workbooks, proposals, memos, briefs, and internal document workflows |
+| **Privacy model** | Local-first; no cloud service is required, and real templates are git-ignored |
+| **Core guarantee** | Brand, structure, styles, layouts, ranges, and formulas are resolved from the extracted Brand Profile |
+| **Current release** | [v0.1.0](https://github.com/ferdinandobons/brand-docs/releases/tag/v0.1.0) alpha |
 
 ### Why not just ask an AI to "use this template"?
 
@@ -63,6 +79,19 @@ General-purpose document skills generate *freely* and only loosely imitate a ref
 | Reusability | re-explain the brand every time | **extract once**, reuse forever via `brand-kit/` |
 | Structure | free-form | **respects the template's cover → contents → body order** |
 | Guardrails | none | `verify` fails if a profile references a missing style/layout/range |
+
+---
+
+## Common use cases
+
+- **Consulting and operations reports** - generate branded Word reports, memos,
+  briefs and status updates from the approved corporate template.
+- **Sales and marketing decks** - create PowerPoint presentations from real
+  masters and layouts instead of asking an AI to invent approximate slides.
+- **Finance and planning workbooks** - fill named Excel inputs and regions while
+  preserving formulas and workbook structure.
+- **Repeatable agent workflows** - give Claude Code, Codex or another agent a
+  reusable Brand Profile instead of re-explaining the brand for every document.
 
 ---
 
