@@ -2,7 +2,12 @@
 
 All notable changes to BrandDocs are documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-06-08
+
+Native charts across all three formats, a deterministic-cover subtitle fill, a
+single source of truth for component-survival, and a round of correctness +
+quality fixes from a multi-agent code review. Brand Profiles from 0.1.x/0.2.0 keep
+working unchanged.
 
 ### Added
 
