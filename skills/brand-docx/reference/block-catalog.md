@@ -51,8 +51,13 @@ The 16 block `type` values (the keys of `BLOCK_TYPES`):
   REFERENCES the workbook's own cell ranges via openpyxl - the data lives in the
   sheet, which is the spreadsheet's strength.
 - **`smartart`** - a diagram. Carries `diagram` (default `"process"`) and `nodes`
-  (`[{text, children}]`). Resolves to `smartart.{diagram}` (clone-fill or rendered
-  image).
+  (`[{text, children}]`). Authored as a NATIVE, on-brand (theme-colored) diagram:
+  on **pptx** as autoshapes (a chevron row for a process/flow, a stacked rounded-box
+  list otherwise); on **docx** as a brand-styled table (a process is a single row,
+  one cell per step; a list a single column, one row per node). A node's `children`
+  are kept (sub-lines in the pptx shape, inlined in the docx cell), so nothing is
+  lost; an empty diagram degrades loudly. The diagram is rendered, not editable
+  SmartArt (the layout-engine parts are not authored).
 - **`component`** - a reference to a reusable single fragment. Carries `ref` (names
   a `components/<ref>` profile entry) and `slots` (fills its render contract).
   Expanded into primitive sub-blocks before resolution.

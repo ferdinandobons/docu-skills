@@ -711,6 +711,86 @@ class NativeDocxChartTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Native docx SmartArt (ir.SmartArt -> a brand-styled table, not flattened)
+# ---------------------------------------------------------------------------
+class NativeDocxSmartArtTest(unittest.TestCase):
+    """SmartArt is authored as a native brand table: a process is a single ROW (one
+    cell per step), a list a single COLUMN (one row per node); a node's children are
+    inlined so nothing is lost. An empty diagram degrades loudly."""
+
+    def _shell(self, tp):
+        shell = tp / "shell.docx"
+        d = Document()
+        d.add_paragraph("x", style="Heading 1")
+        d.save(shell)
+        return shell
+
+    def test_process_and_list_become_brand_tables(self):
+        import tempfile
+
+        idoc = ir.IntermediateDocument(
+            blocks=[
+                ir.SmartArt(
+                    diagram="process",
+                    nodes=[{"text": "Plan"}, {"text": "Build"}, {"text": "Ship"}],
+                ),
+                ir.SmartArt(
+                    diagram="list",
+                    nodes=[
+                        {"text": "Quality", "children": [{"text": "tests"}]},
+                        {"text": "Speed"},
+                    ],
+                ),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as t:
+            tp = Path(t)
+            out = tp / "out.docx"
+            sink: list[Finding] = []
+            docx_generate.generate(
+                _docx_profile({"_index": []}), self._shell(tp), idoc, out, findings=sink
+            )
+            tables = Document(out).tables
+            self.assertEqual(len(tables), 2)
+            proc, lst = tables[0], tables[1]
+            # process -> one row, one cell per step
+            self.assertEqual(len(proc.rows), 1)
+            self.assertEqual(len(proc.columns), 3)
+            self.assertEqual(proc.rows[0].cells[0].text, "Plan")
+            # list -> one column, one row per node; the child is inlined (not lost)
+            self.assertEqual(len(lst.columns), 1)
+            self.assertEqual(len(lst.rows), 2)
+            self.assertIn("tests", lst.rows[0].cells[0].text)
+            self.assertFalse(
+                any(
+                    f.check == "block_degraded" and "smartart" in f.message
+                    for f in sink
+                )
+            )
+
+    def test_empty_smartart_degrades(self):
+        import tempfile
+
+        idoc = ir.IntermediateDocument(
+            blocks=[ir.SmartArt(diagram="process", nodes=[])]
+        )
+        with tempfile.TemporaryDirectory() as t:
+            tp = Path(t)
+            out = tp / "out.docx"
+            sink: list[Finding] = []
+            docx_generate.generate(
+                _docx_profile({"_index": []}), self._shell(tp), idoc, out, findings=sink
+            )
+            self.assertEqual(len(Document(out).tables), 0)
+            self.assertTrue(
+                any(
+                    f.check == "block_degraded" and "smartart" in f.message
+                    for f in sink
+                )
+            )
+
+
+# ---------------------------------------------------------------------------
 # M2 - nested lists
 # ---------------------------------------------------------------------------
 class NestedListTest(unittest.TestCase):

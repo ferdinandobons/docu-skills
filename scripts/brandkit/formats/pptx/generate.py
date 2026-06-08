@@ -44,11 +44,10 @@ KPI groups (authored as a native brand table, one row per metric), and images
 unresolved source degrades loudly, never crashes), and charts (a native
 ``graphicFrame``/``c:chart`` via ``add_chart``, inheriting the deck theme's accent
 colors so it is on-brand by construction; an unknown ``chart_type`` falls back to a
-clustered column chart with an INFO note). SmartArt is still flattened to body text,
-recording a ``block_degraded`` WARNING (symmetric with the docx vertical) so a deck
-that loses a native object is visible in QA rather than silently down-rendered. A
-component-survival check (shell-vs-output native counts) backs the same guarantee
-from the QA side.
+clustered column chart with an INFO note), and SmartArt (native brand-themed
+autoshapes - a chevron row for a process/flow, a stacked rounded-box list otherwise,
+inheriting the deck theme accent fill). A component-survival check (shell-vs-output
+native counts) backs the same guarantee from the QA side.
 """
 
 from __future__ import annotations
@@ -60,7 +59,7 @@ from typing import Optional
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
-from pptx.enum.shapes import PP_PLACEHOLDER
+from pptx.enum.shapes import MSO_SHAPE, PP_PLACEHOLDER
 
 from brandkit.common import text as textutil
 from brandkit.formats.pptx import structure
@@ -116,6 +115,7 @@ class SlideChunk:
     table: Optional[ir.Table] = None
     image: Optional[ir.Image] = None
     chart: Optional[ir.Chart] = None
+    smartart: Optional[ir.SmartArt] = None
 
 
 def generate(
@@ -546,6 +546,9 @@ def _append_content_slides(
             elif chunk.chart is not None:
                 _clear_body_placeholder(body)
                 _add_native_chart(slide, prs, chunk.chart, body, sink)
+            elif chunk.smartart is not None:
+                _clear_body_placeholder(body)
+                _add_native_smartart(slide, prs, chunk.smartart, body, sink)
             elif chunk.lines:
                 if body is not None:
                     _write_body_lines(body, chunk.lines)
@@ -597,6 +600,14 @@ def _content_chunks(blocks: list, capacity: int, sink: list) -> list[SlideChunk]
                 chunks.append(SlideChunk(lines=[], chart=block))
             else:
                 _degrade(sink, "chart", note="had no series/categories; skipped")
+        elif isinstance(block, ir.SmartArt):
+            # SmartArt -> native brand-themed shapes (a chevron row for a process, a
+            # stacked box list otherwise), not flattened to body text.
+            flush_pending()
+            if _smartart_labels(block):
+                chunks.append(SlideChunk(lines=[], smartart=block))
+            else:
+                _degrade(sink, "smartart", note="had no nodes; skipped")
         else:
             pending.append(block)
     flush_pending()
@@ -721,6 +732,69 @@ def _add_native_chart(slide, prs, chart: ir.Chart, body_placeholder, sink) -> No
     native.has_title = bool(title)
     if title:
         native.chart_title.text_frame.text = title
+
+
+# SmartArt diagram families rendered as a stacked box LIST (vs the default chevron
+# ROW for a process/flow). A FORMAT layout choice, not a brand value.
+_SMARTART_LIST_DIAGRAMS = frozenset(
+    {"list", "hierarchy", "pyramid", "table", "vertical_list", "bullet_list"}
+)
+
+
+def _smartart_node_text(node) -> str:
+    """One node's label: its text, plus any child texts as sub-lines (``\\n`` makes
+    real paragraphs in a pptx shape), so a nested node loses nothing."""
+    if not isinstance(node, dict):
+        return str(node or "").strip()
+    text = str(node.get("text") or "").strip()
+    kids = [
+        str(c.get("text") if isinstance(c, dict) else c or "").strip()
+        for c in (node.get("children") or [])
+    ]
+    kids = [k for k in kids if k]
+    if kids:
+        text = (text + "\n" + "\n".join(kids)).strip()
+    return text
+
+
+def _smartart_labels(smartart: ir.SmartArt) -> list[str]:
+    """Non-empty node labels (text + flattened children) for the diagram."""
+    return [t for t in (_smartart_node_text(n) for n in (smartart.nodes or [])) if t]
+
+
+def _add_native_smartart(
+    slide, prs, smartart: ir.SmartArt, body_placeholder, sink
+) -> None:
+    """Author an ``ir.SmartArt`` as NATIVE brand-themed autoshapes (a chevron ROW for
+    a process/flow, a stacked rounded-box LIST otherwise), sized to the body
+    placeholder. The shapes inherit the deck theme's accent fill, so the diagram is
+    on-brand by construction - no literal color. A node's children become sub-lines
+    inside its shape (never dropped). An empty diagram degrades loudly upstream."""
+    labels = _smartart_labels(smartart)
+    if not labels:
+        _degrade(sink, "smartart", note="had no nodes; skipped")
+        return
+    left, top, width, height = _table_bounds(prs, body_placeholder)
+    n = len(labels)
+    is_list = (smartart.diagram or "process").lower() in _SMARTART_LIST_DIAGRAMS
+    gap = 90000
+    if is_list:  # stacked rounded-rectangle boxes
+        box_h = max(360000, int((height - gap * (n - 1)) / n))
+        y = top
+        for label in labels:
+            shp = slide.shapes.add_shape(
+                MSO_SHAPE.ROUNDED_RECTANGLE, left, y, width, box_h
+            )
+            shp.text_frame.text = label
+            y += box_h + gap
+    else:  # chevron row (process / flow)
+        box_w = max(360000, int((width - gap * (n - 1)) / n))
+        box_h = min(height, 1100000)
+        x = left
+        for label in labels:
+            shp = slide.shapes.add_shape(MSO_SHAPE.CHEVRON, x, top, box_w, box_h)
+            shp.text_frame.text = label
+            x += box_w + gap
 
 
 def _clear_body_placeholder(body) -> None:
@@ -1099,12 +1173,12 @@ def _body_lines(blocks: list, sink: list) -> list[BodyLine]:
     ``indent`` (level) so the layout supplies the bullet; quotes (with attribution),
     captions and callouts each become their own line(s).
 
-    Tables, KPI groups, images and charts are intercepted by ``_content_chunks``
-    and authored as native shapes BEFORE reaching here; the matching branches below
-    are a defensive fallback that only fires when ``_body_lines`` is called directly
-    (e.g. a unit test). SmartArt has no native writer yet and is flattened to body
-    text. Each flattening records a ``block_degraded`` WARNING on ``sink`` so the
-    down-render is visible in QA (symmetric with the docx vertical), never silent.
+    Tables, KPI groups, images, charts and SmartArt are intercepted by
+    ``_content_chunks`` and authored as native shapes BEFORE reaching here; the
+    matching branches below are a defensive fallback that only fires when
+    ``_body_lines`` is called directly (e.g. a unit test). Each such fallback records
+    a ``block_degraded`` WARNING on ``sink`` so the down-render is visible in QA
+    (symmetric with the docx vertical), never silent.
     """
     lines: list[BodyLine] = []
     for block in blocks:

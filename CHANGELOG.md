@@ -2,6 +2,19 @@
 
 All notable changes to BrandDocs are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- `smartart` blocks are now authored as a NATIVE, on-brand diagram instead of
+  degrading to text - completing native rendering for every block type. On **pptx**
+  the diagram is real autoshapes (a chevron row for a process/flow, a stacked
+  rounded-box list otherwise), inheriting the deck theme's accent fill. On **docx**
+  it is a brand-styled table (a process is a single row, one cell per step; a list a
+  single column, one row per node). A node's `children` are preserved (sub-lines in
+  the pptx shape, inlined in the docx cell); an empty diagram degrades loudly. The
+  diagram is rendered (not editable SmartArt with the layout-engine parts).
+
 ## [0.3.0] - 2026-06-08
 
 Native charts across all three formats, a deterministic-cover subtitle fill, a

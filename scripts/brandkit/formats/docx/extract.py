@@ -172,6 +172,7 @@ def _capabilities() -> dict:
         "generates_from_shell": True,
         "visual_overflow_requires_render": True,
         "native_charts": True,
+        "native_smartart": True,
     }
 
 

@@ -298,6 +298,7 @@ def _capabilities() -> dict:
         "generates_from_shell": True,
         "overflow_guard": "conservative_text_split",
         "native_charts": True,
+        "native_smartart": True,
     }
 
 

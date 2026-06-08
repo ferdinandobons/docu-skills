@@ -1841,5 +1841,97 @@ class NativeChartTest(unittest.TestCase):
             self.assertEqual(len(charts[0].plots[0].series), 1)
 
 
+# ---------------------------------------------------------------------------
+# Native PPTX SmartArt (ir.SmartArt -> brand-themed autoshapes, not flattened)
+# ---------------------------------------------------------------------------
+class NativeSmartArtTest(unittest.TestCase):
+    """A SmartArt block is authored as REAL brand-themed autoshapes (a chevron row
+    for a process, a stacked box list otherwise), not flattened to body text:
+    correct shape count, node text + children preserved, byte-idempotent, empty
+    degrades loudly."""
+
+    _IDOC = {
+        "blocks": [
+            {"type": "heading", "level": 1, "runs": [{"t": "Flow"}]},
+            {
+                "type": "smartart",
+                "diagram": "process",
+                "nodes": [{"text": "Plan"}, {"text": "Build"}, {"text": "Ship"}],
+            },
+            {"type": "heading", "level": 1, "runs": [{"t": "Pillars"}]},
+            {
+                "type": "smartart",
+                "diagram": "list",
+                "nodes": [
+                    {"text": "Quality", "children": [{"text": "tests"}]},
+                    {"text": "Speed"},
+                ],
+            },
+        ]
+    }
+
+    def _autoshapes(self, prs):
+        from pptx.enum.shapes import MSO_SHAPE_TYPE
+
+        return [
+            sh
+            for s in prs.slides
+            for sh in s.shapes
+            if sh.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE
+        ]
+
+    def test_smartart_becomes_native_shapes(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            template = tmp / "t.pptx"
+            _branded_template(template)
+            profile = _extract_profile(template)
+            out = tmp / "out.pptx"
+            sink: list[Finding] = []
+            pg.generate(profile, template, parse_idoc(self._IDOC), out, findings=sink)
+            shapes = self._autoshapes(Presentation(out))
+            # 3 process chevrons + 2 list boxes = 5 native shapes.
+            self.assertEqual(len(shapes), 5)
+            texts = "\n".join(sh.text_frame.text for sh in shapes)
+            self.assertIn("Plan", texts)
+            self.assertIn("Quality", texts)
+            self.assertIn("tests", texts)  # a child is preserved as a sub-line
+            self.assertFalse(
+                any(
+                    f.check == "block_degraded" and "smartart" in f.message
+                    for f in sink
+                )
+            )
+
+    def test_smartart_is_byte_idempotent(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            template = tmp / "t.pptx"
+            _branded_template(template)
+            profile = _extract_profile(template)
+            a, b = tmp / "a.pptx", tmp / "b.pptx"
+            pg.generate(profile, template, parse_idoc(self._IDOC), a)
+            pg.generate(profile, template, parse_idoc(self._IDOC), b)
+            self.assertEqual(a.read_bytes(), b.read_bytes())
+
+    def test_empty_smartart_degrades(self):
+        idoc = {"blocks": [{"type": "smartart", "diagram": "process", "nodes": []}]}
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            template = tmp / "t.pptx"
+            _branded_template(template)
+            profile = _extract_profile(template)
+            out = tmp / "out.pptx"
+            sink: list[Finding] = []
+            pg.generate(profile, template, parse_idoc(idoc), out, findings=sink)
+            self.assertEqual(len(self._autoshapes(Presentation(out))), 0)
+            self.assertTrue(
+                any(
+                    f.check == "block_degraded" and "smartart" in f.message
+                    for f in sink
+                )
+            )
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

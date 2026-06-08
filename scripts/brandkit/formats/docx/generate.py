@@ -35,9 +35,7 @@ from brandkit.qa.model import Finding
 # dropped silently or rendered as an empty ``Normal`` paragraph. ``toc`` is a true
 # no-op in the body (the live TOC field is refreshed separately by ``refresh_toc``)
 # so it is degraded as INFO, not WARNING.
-_UNHANDLED_BLOCK_TYPES: frozenset[str] = frozenset(
-    {"smartart", "component", "section", "toc"}
-)
+_UNHANDLED_BLOCK_TYPES: frozenset[str] = frozenset({"component", "section", "toc"})
 
 
 class GenerationError(ValueError):
@@ -391,6 +389,8 @@ def _write_block(
         _write_kpi(doc, resolver, block, findings)
     elif isinstance(block, ir.Chart):
         _write_chart(doc, block, findings)
+    elif isinstance(block, ir.SmartArt):
+        _write_smartart(doc, resolver, block, findings)
     elif block.TYPE in _UNHANDLED_BLOCK_TYPES:
         # No writer for this block in the M1 docx vertical. Skip cleanly - NEVER
         # emit a blank ``Normal`` paragraph - and record a degradation finding so
@@ -593,6 +593,56 @@ def _write_chart(doc, block, findings) -> None:
     )
     run = doc.add_paragraph().add_run()
     run._r.append(parse_xml(drawing))
+
+
+# SmartArt diagram families rendered as a single-COLUMN table (one row per node) vs
+# the default single-ROW process strip. A FORMAT layout choice, not a brand value.
+_SMARTART_LIST_DIAGRAMS = frozenset(
+    {"list", "hierarchy", "pyramid", "table", "vertical_list", "bullet_list"}
+)
+
+
+def _smartart_node_text(node) -> str:
+    """One node's label: its text plus any child texts inline (a docx table cell has
+    no soft line break, so children are joined with ' - '), so nesting is not lost."""
+    if not isinstance(node, dict):
+        return str(node or "").strip()
+    text = str(node.get("text") or "").strip()
+    kids = [
+        str(c.get("text") if isinstance(c, dict) else c or "").strip()
+        for c in (node.get("children") or [])
+    ]
+    kids = [k for k in kids if k]
+    if kids:
+        text = f"{text} - {'; '.join(kids)}".strip(" -")
+    return text
+
+
+def _write_smartart(doc, resolver, block, findings) -> None:
+    """Author an ``ir.SmartArt`` as a NATIVE brand-styled table, reusing the table
+    writer: a process/flow becomes a single ROW (one cell per step), a list/
+    hierarchy a single COLUMN (one row per node). On-brand via the profile's table
+    style - never a fabricated diagram color. An empty diagram degrades to a loud
+    ``block_degraded`` WARNING, never a silent drop. (The pptx vertical renders the
+    same SmartArt as native chevron/box shapes.)"""
+    labels = [t for t in (_smartart_node_text(n) for n in (block.nodes or [])) if t]
+    if not labels:
+        findings.append(
+            Finding(
+                "block_degraded",
+                schema.Severity.WARNING.value,
+                "'smartart' block had no nodes; skipped",
+            )
+        )
+        return
+    is_list = (block.diagram or "process").lower() in _SMARTART_LIST_DIAGRAMS
+    if is_list:
+        rows = [[ir.TableCell(runs=[{"t": label}])] for label in labels]
+    else:
+        rows = [[ir.TableCell(runs=[{"t": label}]) for label in labels]]
+    _write_table(
+        doc, resolver, ir.Table(columns=[], rows=rows, role="default"), findings
+    )
 
 
 def _write_list_items(doc, resolver, block, items, findings) -> None:

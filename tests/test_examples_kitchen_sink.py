@@ -226,20 +226,20 @@ class DocxKitchenSink(_Base):
             self.assertTrue(any(r.underline for r in runs), "underline run lost")
             body_xml = ET.tostring(doc.element.body).decode().lower()
             self.assertIn("hyperlink", body_xml, "hyperlink lost")
-            # Divider is native (a paragraph border), image is native (a:blip drawing),
-            # KPI is native (a brand table), chart is native (a c:chart part) - none
-            # should be a degraded warning.
+            # Divider/image/KPI/chart/SmartArt are ALL native now (paragraph border,
+            # a:blip drawing, brand table, c:chart part, a brand table built from the
+            # diagram nodes) - none should be a degraded warning.
             self.assertIn("pbdr", body_xml, "native divider rule missing")
             self.assertIn("a:blip", body_xml, "native image not placed")
             self.assertIn("c:chart", body_xml, "native chart drawing not placed")
             degraded = _degraded_kinds(sink)
             self.assertEqual(
-                degraded & {"divider", "image", "kpi", "chart"},
+                degraded & {"divider", "image", "kpi", "chart", "smartart"},
                 set(),
                 f"these should be native now: {degraded}",
             )
-            # Genuinely-deferred native writers still degrade loudly (never silently).
-            self.assertTrue({"smartart"} <= degraded)
+            # toc is the only block with no docx body writer (INFO degrade, never silent).
+            self.assertIn("toc", degraded)
             # Output fidelity on the SHOWCASE profile (different brand style names than
             # the synthetic fixture): lists carry real numbering and the table carries
             # the brand table style, so role nomination is exercised end-to-end.
@@ -302,16 +302,15 @@ class PptxKitchenSink(_Base):
                 [f.message for f in report.findings if f.severity == "ERROR"],
             )
             degraded = _degraded_kinds(sink)
-            # KPI (native table), Image (native picture from a real src) and Chart
-            # (native PowerPoint chart) no longer degrade; only smartart still has no
-            # native writer and degrades loudly.
+            # KPI (native table), Image (native picture), Chart (native PowerPoint
+            # chart) and SmartArt (native chevron/box shapes) no longer degrade.
             self.assertEqual(
-                degraded & {"kpi", "image", "chart"},
+                degraded & {"kpi", "image", "chart", "smartart"},
                 set(),
-                f"kpi/image/chart should be native now: {degraded}",
+                f"these should be native now: {degraded}",
             )
-            self.assertTrue({"smartart"} <= degraded)
-            # A picture shape, a (KPI) table shape and a chart shape are authored.
+            # A picture shape, a (KPI) table shape, a chart shape and a SmartArt
+            # autoshape are all authored.
             prs = Presentation(out)
             has_pic = any(
                 sh.shape_type == 13
@@ -320,9 +319,15 @@ class PptxKitchenSink(_Base):
             )
             has_tbl = any(sh.has_table for s in prs.slides for sh in s.shapes)
             has_chart = any(sh.has_chart for s in prs.slides for sh in s.shapes)
+            has_autoshape = any(
+                sh.shape_type == 1  # MSO_SHAPE_TYPE.AUTO_SHAPE (SmartArt chevron/box)
+                for s in prs.slides
+                for sh in s.shapes
+            )
             self.assertTrue(has_pic, "native picture not placed")
             self.assertTrue(has_tbl, "native KPI/table shape not placed")
             self.assertTrue(has_chart, "native chart shape not placed")
+            self.assertTrue(has_autoshape, "native SmartArt shape not placed")
 
     def test_reconcile_path_no_duplicate_parts(self):
         # Reconcile/comprehension path against the SHOWCASE deck: clearing a demo
