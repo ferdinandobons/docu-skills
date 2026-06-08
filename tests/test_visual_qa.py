@@ -635,10 +635,12 @@ class ManifestTest(unittest.TestCase):
 
         def fake_run(args, *unused_args, **unused_kwargs):
             if args and Path(args[0]).name == "tesseract":
+                # tesseract output is captured as BYTES (no text=True), so the fake
+                # mirrors that; _ocr_png decodes it tolerantly.
                 return SimpleNamespace(
                     returncode=0,
-                    stdout="Generated page\nOld template subtitle\n",
-                    stderr="",
+                    stdout=b"Generated page\nOld template subtitle\n",
+                    stderr=b"",
                 )
             return orig_run(args, *unused_args, **unused_kwargs)
 
@@ -1479,6 +1481,30 @@ class RealRenderE2ETest(unittest.TestCase):
                 self.assertTrue(data["pages"])
             finally:
                 os.chdir(old)
+
+
+class OcrRobustnessTest(unittest.TestCase):
+    """``_ocr_png`` must tolerate non-UTF-8 bytes from tesseract instead of crashing
+    the whole QA run (tesseract can emit stray bytes - e.g. a 0x89 PNG byte in a
+    fallback error path - which ``text=True`` would hard-fail on)."""
+
+    def test_non_utf8_stdout_is_decoded_not_crashed(self) -> None:
+        def fake_run(args, *unused_args, **unused_kwargs):
+            return SimpleNamespace(returncode=0, stdout=b"ok \x89PNG text", stderr=b"")
+
+        with patch.object(subprocess, "run", fake_run):
+            text, err = vqa._ocr_png("tesseract", Path("/x/page-1.png"), timeout_s=5)
+        self.assertIsNone(err)
+        self.assertIn("ok", text)  # decoded tolerantly, no UnicodeDecodeError
+
+    def test_non_utf8_error_output_degrades_gracefully(self) -> None:
+        def fake_run(args, *unused_args, **unused_kwargs):
+            return SimpleNamespace(returncode=1, stdout=b"", stderr=b"boom \x89PNG")
+
+        with patch.object(subprocess, "run", fake_run):
+            text, err = vqa._ocr_png("tesseract", Path("/x/page-1.png"), timeout_s=5)
+        self.assertEqual(text, "")
+        self.assertIsNotNone(err)  # error surfaced (decoded), run not crashed
 
 
 if __name__ == "__main__":

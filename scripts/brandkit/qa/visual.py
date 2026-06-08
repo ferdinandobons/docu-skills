@@ -707,10 +707,12 @@ def _empty_ocr_report(profile: dict, *, reason: str) -> dict:
 
 def _ocr_png(tesseract: str, png: Path, *, timeout_s: int) -> tuple[str, str | None]:
     try:
+        # Capture BYTES (not text=True): tesseract output is usually UTF-8 but can
+        # carry stray non-UTF-8 bytes, and text=True would hard-crash the whole QA
+        # run on a UnicodeDecodeError instead of degrading. Decode tolerantly below.
         proc = subprocess.run(
             [tesseract, str(png), "stdout", "--psm", "6"],
             capture_output=True,
-            text=True,
             timeout=timeout_s,
             check=False,
         )
@@ -724,7 +726,7 @@ def _ocr_png(tesseract: str, png: Path, *, timeout_s: int) -> tuple[str, str | N
             or _short_output(proc.stdout)
             or f"exit code {proc.returncode}"
         )
-    return proc.stdout or "", None
+    return (proc.stdout or b"").decode("utf-8", errors="replace"), None
 
 
 def _ocr_terms(profile: dict) -> list[str]:
