@@ -30,12 +30,13 @@ from brandkit.qa.checks_deterministic import (
 )
 from brandkit.qa.model import Finding
 
-# Block types that carry no DOCX writer in the M1 vertical. They are skipped
-# cleanly (no blank paragraph) and recorded as a degradation finding rather than
-# dropped silently or rendered as an empty ``Normal`` paragraph. ``toc`` is a true
-# no-op in the body (the live TOC field is refreshed separately by ``refresh_toc``)
-# so it is degraded as INFO, not WARNING.
-_UNHANDLED_BLOCK_TYPES: frozenset[str] = frozenset({"component", "section", "toc"})
+# Block types that carry no DOCX writer. ``component``/``section`` are EXPANDED to
+# primitives before this writer runs (``expand_components``), so they should never
+# reach it; this set is the defensive fail-loud backstop if one ever survives. A
+# block in this set is skipped cleanly (no blank paragraph) and recorded as a
+# degradation finding rather than dropped silently. ``toc`` is now a native writer
+# (``_write_toc``), so it is no longer here.
+_UNHANDLED_BLOCK_TYPES: frozenset[str] = frozenset({"component", "section"})
 
 
 class GenerationError(ValueError):
@@ -391,26 +392,53 @@ def _write_block(
         _write_chart(doc, block, findings)
     elif isinstance(block, ir.SmartArt):
         _write_smartart(doc, resolver, block, findings)
+    elif isinstance(block, ir.Toc):
+        _write_toc(doc, resolver, block, findings)
     elif block.TYPE in _UNHANDLED_BLOCK_TYPES:
-        # No writer for this block in the M1 docx vertical. Skip cleanly - NEVER
-        # emit a blank ``Normal`` paragraph - and record a degradation finding so
-        # the dropped content is visible in QA instead of silently lost.
-        sev = (
-            schema.Severity.INFO.value
-            if block.TYPE == "toc"
-            else schema.Severity.WARNING.value
-        )
+        # No writer for this block. Skip cleanly - NEVER emit a blank ``Normal``
+        # paragraph - and record a degradation finding so the skipped content is
+        # visible in QA instead of silently lost. (component/section are normally
+        # expanded away before this writer; reaching here is the defensive path.)
         findings.append(
             Finding(
                 "block_degraded",
-                sev,
-                f"{block.TYPE!r} block not rendered in docx M1 vertical (skipped, no placeholder emitted)",
+                schema.Severity.WARNING.value,
+                f"{block.TYPE!r} block not rendered in docx vertical (skipped, no placeholder emitted)",
             )
         )
     else:
         # A genuinely unknown block type is a programming error, not a degradation:
         # fail loudly rather than dropping authored content or injecting a blank.
         raise GenerationError(f"unhandled block type {block.TYPE!r}")
+
+
+def _write_toc(doc, resolver, block, findings) -> None:
+    """Render an authored ``toc`` block as a native, updateable table of contents.
+
+    If the shell already carries a structural TOC (preserved through the body
+    clear), DEFER to it: that canonical TOC is refreshed by ``refresh_toc`` and a
+    second one would duplicate it (the interplay this writer is careful to avoid).
+    Otherwise author a native outline TOC field at the block's flow position; its
+    visible cache is filled from the generated headings by
+    ``refresh_visible_outline_toc_cache`` and it is marked dirty + ``updateFields``
+    by ``refresh_toc`` (both run after the body is built), so Word rebuilds it on
+    open. An optional title heading uses the resolved ``toc`` role style.
+    """
+    if structure.is_outline_toc_present(doc):
+        findings.append(
+            Finding(
+                "toc_deferred",
+                schema.Severity.INFO.value,
+                "toc block deferred to the template's preserved outline table of "
+                "contents (already present; no duplicate emitted)",
+            )
+        )
+        return
+    if block.title:
+        para = doc.add_paragraph()
+        para.add_run(str(block.title))
+        _apply_resolved_style(doc, para, resolver.resolve_role("toc"), findings)
+    structure.append_outline_toc_field(doc, max_level=block.max_level)
 
 
 def _write_kpi(doc, resolver, block, findings) -> None:

@@ -478,19 +478,147 @@ class UnhandledBlockTest(unittest.TestCase):
             with self.assertRaises(docx_generate.GenerationError):
                 docx_generate.generate(prof, shell, idoc, out)
 
-    def test_toc_block_degrades_as_info_not_warning(self):
+
+# ---------------------------------------------------------------------------
+# Native docx TOC (ir.Toc -> a real, updateable outline TOC field, or deferral
+# to a preserved structural TOC so the document never carries two)
+# ---------------------------------------------------------------------------
+def _toc_instr_count(path) -> int:
+    """Count outer TOC field instructions in the output document.xml."""
+    import re
+    import zipfile
+
+    xml = zipfile.ZipFile(path).read("word/document.xml").decode("utf-8", "replace")
+    return len(re.findall(r"<w:instrText[^>]*>\s*TOC\b", xml))
+
+
+def _settings_has_update_fields(path) -> bool:
+    import zipfile
+
+    with zipfile.ZipFile(path) as z:
+        return "updateFields" in z.read("word/settings.xml").decode("utf-8", "replace")
+
+
+class NativeTocTest(unittest.TestCase):
+    def _bare_shell(self, tmp_path):
+        shell = tmp_path / "shell.docx"
+        d = Document()
+        d.add_paragraph("x", style="Heading 1")
+        d.save(shell)
+        return shell
+
+    def _toc_shell(self, tmp_path):
+        shell = tmp_path / "shell.docx"
+        d = Document()
+        _add_toc_field(d)  # a real structural TOC field
+        d.add_paragraph("Body heading", style="Heading 1")
+        d.save(shell)
+        return shell
+
+    def _idoc(self):
+        return ir.IntermediateDocument(
+            blocks=[
+                ir.Heading(level=1, runs=[{"t": "Alpha"}]),
+                ir.Heading(level=2, runs=[{"t": "Beta"}]),
+                ir.Toc(title="Contents", max_level=2),
+                ir.Paragraph(runs=[{"t": "Body."}]),
+            ]
+        )
+
+    def test_native_toc_emitted_when_no_structural_toc(self):
+        import tempfile
+        import zipfile
+
+        with tempfile.TemporaryDirectory() as td:
+            shell = self._bare_shell(Path(td))
+            out = Path(td) / "out.docx"
+            findings: list[Finding] = []
+            docx_generate.generate(
+                _docx_profile({"_index": []}),
+                shell,
+                self._idoc(),
+                out,
+                findings=findings,
+            )
+            # A real, updateable TOC field is authored (not a degradation).
+            self.assertEqual(_toc_instr_count(out), 1)
+            self.assertTrue(_settings_has_update_fields(out))
+            xml = (
+                zipfile.ZipFile(out)
+                .read("word/document.xml")
+                .decode("utf-8", "replace")
+            )
+            self.assertIn('w:dirty="true"', xml)  # begin fldChar marked dirty
+            # Visible cache carries the generated headings, not template samples.
+            self.assertIn("Alpha", xml)
+            self.assertIn("Beta", xml)
+            # The toc block is NOT degraded.
+            self.assertFalse(any(f.check == "block_degraded" for f in findings))
+
+    def test_toc_block_defers_to_preserved_structural_toc(self):
         import tempfile
 
         with tempfile.TemporaryDirectory() as td:
-            shell = self._shell(Path(td))
+            shell = self._toc_shell(Path(td))
             out = Path(td) / "out.docx"
-            prof = _docx_profile({"_index": []})
-            idoc = ir.IntermediateDocument(blocks=[ir.Toc()])
             findings: list[Finding] = []
-            docx_generate.generate(prof, shell, idoc, out, findings=findings)
-            toc_findings = [f for f in findings if f.check == "block_degraded"]
-            self.assertEqual(len(toc_findings), 1)
-            self.assertEqual(toc_findings[0].severity, schema.Severity.INFO.value)
+            docx_generate.generate(
+                _docx_profile({"_index": []}),
+                shell,
+                self._idoc(),
+                out,
+                findings=findings,
+            )
+            # Exactly ONE TOC field survives - the preserved structural one; the
+            # block deferred to it instead of emitting a duplicate.
+            self.assertEqual(_toc_instr_count(out), 1)
+            self.assertTrue(any(f.check == "toc_deferred" for f in findings))
+            self.assertFalse(any(f.check == "block_degraded" for f in findings))
+
+    def test_toc_block_is_not_suppressed_by_a_caption_index_only_shell(self):
+        # A shell whose only strong TOC is a table-of-figures (TOC \c) must NOT
+        # suppress the requested outline TOC: the block defers only to a real
+        # OUTLINE TOC, so here it authors its own.
+        import tempfile
+
+        from docx import Document as _Doc
+
+        with tempfile.TemporaryDirectory() as td:
+            shell = Path(td) / "shell.docx"
+            d = Document()
+            _add_toc_field(d, instr='TOC \\h \\c "Figure"')  # caption index only
+            d.add_paragraph("Body heading", style="Heading 1")
+            d.save(shell)
+            out = Path(td) / "out.docx"
+            findings: list[Finding] = []
+            docx_generate.generate(
+                _docx_profile({"_index": []}),
+                shell,
+                self._idoc(),
+                out,
+                findings=findings,
+            )
+            self.assertFalse(any(f.check == "toc_deferred" for f in findings))
+            # An outline TOC now exists in the output (alongside the caption index).
+            self.assertTrue(structure.is_outline_toc_present(_Doc(out)))
+
+    def test_native_toc_generation_is_idempotent(self):
+        import hashlib
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            shell = self._bare_shell(Path(td))
+            a, b = Path(td) / "a.docx", Path(td) / "b.docx"
+            docx_generate.generate(
+                _docx_profile({"_index": []}), shell, self._idoc(), a
+            )
+            docx_generate.generate(
+                _docx_profile({"_index": []}), shell, self._idoc(), b
+            )
+            self.assertEqual(
+                hashlib.sha256(a.read_bytes()).hexdigest(),
+                hashlib.sha256(b.read_bytes()).hexdigest(),
+            )
 
 
 # ---------------------------------------------------------------------------

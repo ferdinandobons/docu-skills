@@ -201,9 +201,28 @@ def _element_holds_toc(el) -> bool:
 
 
 def is_toc_present(doc) -> bool:
-    """Return True if the document body contains a real (strong) TOC region."""
+    """Return True if the document body contains a real (strong) TOC region.
+
+    Counts ANY strong TOC field, including a caption index / table-of-figures
+    (``TOC \\c``). Used by :func:`refresh_toc` (which marks every TOC field dirty).
+    """
     body = doc.element.body
     return any(_element_holds_strong_toc(child) for child in body)
+
+
+def is_outline_toc_present(doc) -> bool:
+    """Return True if the body carries an OUTLINE TOC field (``TOC \\o``).
+
+    Stricter than :func:`is_toc_present`: a caption index / table-of-figures
+    (``TOC \\c``) does NOT count. An authored ``toc`` block defers only to an
+    outline TOC of the same kind it would itself author, so a shell that ships only
+    a table-of-figures still gets its requested table of contents.
+    """
+    body = doc.element.body
+    return any(
+        not _is_sectpr(child) and _outline_toc_instruction(child) is not None
+        for child in body
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1057,6 +1076,35 @@ def refresh_toc(doc) -> int:
                     begin.set(w("dirty"), "true")
                     marked += 1
     return marked
+
+
+def append_outline_toc_field(doc, *, max_level: int = 3):
+    """Append a native, updateable outline TOC field as ONE body paragraph.
+
+    For an authored ``toc`` block when the shell carries NO structural TOC to defer
+    to. The single-paragraph shape (begin[dirty] / instrText / separate / cache /
+    end) is exactly what :func:`_outline_toc_instruction` recognizes, so
+    :func:`refresh_visible_outline_toc_cache` fills its visible cache from the
+    generated headings and :func:`refresh_toc` marks it dirty and sets
+    ``updateFields`` (both run after the body is built). The paragraph is inserted
+    before the final ``w:sectPr`` so it lands in body-flow order. Returns the
+    appended paragraph element.
+    """
+    level = max(1, int(max_level or 3))
+    instr = f' TOC \\o "1-{level}" \\h \\z \\u '
+    p = OxmlElement("w:p")
+    p.append(_field_run("begin", dirty=True))
+    p.append(_instr_run(instr))
+    p.append(_field_run("separate"))
+    p.append(_text_run("Right-click to update the table of contents."))
+    p.append(_field_run("end"))
+    body = doc.element.body
+    sectpr = body.find(w("sectPr"))
+    if sectpr is not None:
+        sectpr.addprevious(p)
+    else:
+        body.append(p)
+    return p
 
 
 def refresh_visible_outline_toc_cache(doc, headings: list[tuple[int, str]]) -> int:

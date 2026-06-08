@@ -234,12 +234,14 @@ class DocxKitchenSink(_Base):
             self.assertIn("c:chart", body_xml, "native chart drawing not placed")
             degraded = _degraded_kinds(sink)
             self.assertEqual(
-                degraded & {"divider", "image", "kpi", "chart", "smartart"},
+                degraded & {"divider", "image", "kpi", "chart", "smartart", "toc"},
                 set(),
                 f"these should be native now: {degraded}",
             )
-            # toc is the only block with no docx body writer (INFO degrade, never silent).
-            self.assertIn("toc", degraded)
+            # toc is now native too: the showcase shell carries a structural TOC, so
+            # the toc block defers to it (an INFO toc_deferred, never a degradation
+            # and never a duplicate TOC).
+            self.assertTrue(any(f.check == "toc_deferred" for f in sink))
             # Output fidelity on the SHOWCASE profile (different brand style names than
             # the synthetic fixture): lists carry real numbering and the table carries
             # the brand table style, so role nomination is exercised end-to-end.
