@@ -619,6 +619,44 @@ def _reconcile_deck(path: Path) -> str:
     return body_prompt
 
 
+def _reconcile_deck_demo_not_last(path: Path) -> None:
+    """A reconcile deck whose DEMO slide (index 3) is NOT the highest-indexed part:
+    two more structural slides follow it. Clearing it must not orphan a higher slide
+    part that the subsequent add_slide then collides with (duplicate ZIP part name).
+    """
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+    prs.slide_layouts[0].name = "BrandCover"
+    prs.slide_layouts[1].name = "BrandContent"
+    content = prs.slide_layouts[1]
+    body_prompt = ""
+    for ph in content.placeholders:
+        if ph.placeholder_format.idx != 0 and ph.has_text_frame and ph.text:
+            body_prompt = ph.text.strip()
+            break
+    prs.slides.add_slide(prs.slide_layouts[0])  # 0 cover
+    sa = prs.slides.add_slide(content)  # 1 agenda
+    sa.shapes.title.text = "Sommario"
+    pg._first_body_placeholder(sa).text = "Intro\nBody"
+    s2 = prs.slides.add_slide(content)  # 2 structural
+    s2.shapes.title.text = "Structural One"
+    pg._first_body_placeholder(s2).text = "Authored content one."
+    s3 = prs.slides.add_slide(content)  # 3 DEMO (body == layout prompt)
+    s3.shapes.title.text = content.placeholders[0].text.strip() or "Click to edit"
+    if body_prompt:
+        pg._first_body_placeholder(s3).text = body_prompt
+    # Structural slides AFTER the demo -> the demo is not the highest part index.
+    s4 = prs.slides.add_slide(content)  # 4 structural
+    s4.shapes.title.text = "Structural Two"
+    pg._first_body_placeholder(s4).text = "Authored content two."
+    s5 = prs.slides.add_slide(content)  # 5 structural
+    s5.shapes.title.text = "Structural Three"
+    pg._first_body_placeholder(s5).text = "Authored content three."
+    _add_section_list(prs, sections=[("Intro", [0]), ("Body", [1, 2, 3, 4, 5])])
+    prs.save(path)
+
+
 def _extract_on_disk(template: Path, tp: Path, name: str = "deck") -> dict:
     profile_path = px.extract(template, name, scope="project", cwd=tp)
     return json.loads(Path(profile_path).read_text())
@@ -887,6 +925,28 @@ class MI7ReconcileNotRebuildTest(unittest.TestCase):
                     for f in findings
                 )
             )
+
+    def test_clearing_a_non_last_demo_slide_yields_no_duplicate_parts(self) -> None:
+        # Regression (synthetic, isolated): a demo clear where the demo slide is NOT
+        # the highest-indexed part must not orphan a higher slide part that the next
+        # add_slide then collides with (duplicate ZIP part name -> corrupt OPC
+        # package). Complements the example-template reconcile test; this builds the
+        # exact mid-index-demo geometry the original 4-slide fixture (demo last) missed.
+        import zipfile
+        from collections import Counter
+
+        with tempfile.TemporaryDirectory() as td:
+            tp = Path(td)
+            template = tp / "deck.pptx"
+            _reconcile_deck_demo_not_last(template)
+            prof = _extract_on_disk(template, tp)
+            _present_comp(prof, self._comp_for(prof, demo_slide_ref="region.slide.3"))
+            out = tp / "out.pptx"
+            pg.generate(prof, template, self._idoc(), out)
+            names = zipfile.ZipFile(out).namelist()
+            dups = [n for n, c in Counter(names).items() if c > 1]
+            self.assertEqual(dups, [], f"duplicate package parts: {dups}")
+            Presentation(out)  # reopens cleanly
 
     def test_generate_twice_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as td:
