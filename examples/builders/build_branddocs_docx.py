@@ -134,6 +134,19 @@ def _fldchar(kind: str, *, dirty: bool = False) -> etree._Element:
     return r
 
 
+def _add_external_hyperlink(doc, paragraph, url: str, text: str) -> None:
+    """Append a real ``w:hyperlink`` (external relationship) carrying ``text``.
+
+    Builds the ``r:id``-namespaced attribute directly (the ``_sub`` helper only sets
+    ``w:`` attributes). No ``Hyperlink`` character style is referenced (the template
+    does not register one); the link is realized purely by the relationship.
+    """
+    rid = doc.part.relate_to(url, f"{R}/hyperlink", is_external=True)
+    hl = etree.SubElement(paragraph._p, _w("hyperlink"))
+    hl.set(f"{{{R}}}id", rid)
+    hl.append(_run(text))
+
+
 def _set_pstyle(paragraph, style_id: str) -> None:
     """Stamp ``w:pPr/w:pStyle@w:val`` on a paragraph by STYLE ID directly.
 
@@ -860,6 +873,12 @@ def _build_demo_body(doc):
         "Figures are drawn from a synthetic operations dataset maintained by the "
         "BrandDocs brand office. Revenue, growth, and regional splits are "
         "illustrative and should not be read as real performance data."
+    )
+    # A real external hyperlink (w:hyperlink -> external relationship): a near-
+    # universal template element, and one the generator now authors natively too.
+    link_p = doc.add_paragraph("Full brand guidelines: ")
+    _add_external_hyperlink(
+        doc, link_p, "https://example.com/brand", "brand.example.com"
     )
 
 

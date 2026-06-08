@@ -333,6 +333,11 @@ def _add_content_text(prs):
         ],
         size=18,
     )
+    # Speaker notes: a standard deck artifact (the notes slide + its text frame).
+    slide.notes_slide.notes_text_frame.text = (
+        "Speaker notes: lead with the 18% YoY headline, then the 230 bps margin "
+        "expansion. Pause on the input-cost risk before the regional breakdown."
+    )
     return slide
 
 

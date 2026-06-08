@@ -53,7 +53,15 @@ from openpyxl.formatting.rule import (
     DataBarRule,
     FormulaRule,
 )
-from openpyxl.styles import Alignment, Border, Font, NamedStyle, PatternFill, Side
+from openpyxl.styles import (
+    Alignment,
+    Border,
+    Font,
+    NamedStyle,
+    PatternFill,
+    Protection,
+    Side,
+)
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
@@ -224,6 +232,16 @@ def _build_inputs(wb: Workbook) -> None:
     ws.freeze_panes = "A4"
     ws.column_dimensions["A"].width = 18
     ws.column_dimensions["B"].width = 14
+    # Distributed-template convention: lock the sheet but leave ONLY the input
+    # value cells (B4:B7) editable, so a recipient fills the blue inputs and cannot
+    # disturb the model. (openpyxl honors locked/unlocked on save; enforcement is
+    # Excel-side, so the generator can still fill the named region programmatically.)
+    for r in range(4, 8):
+        ws.cell(row=r, column=2).protection = Protection(locked=False)
+    ws.protection.sheet = True
+    # Print-ready header/footer with live fields (sheet name + page x of y).
+    ws.oddHeader.center.text = "&A"
+    ws.oddFooter.right.text = "Page &P of &N"
 
 
 def _build_model(wb: Workbook) -> None:
