@@ -6,7 +6,7 @@
 
 # BrandDocs: AI On-Brand Document Generator for Word, PowerPoint & Excel
 
-**BrandDocs turns existing Word, PowerPoint and Excel templates into reusable AI document-generation skills.** Unlike generic AI document generators, it preserves **brand, structure, styles and formulas by construction**. Built for Claude Code, Codex and compatible AI agents.
+**BrandDocs is a set of agent skills that learn your existing Word, PowerPoint and Excel templates and generate new on-brand documents from them.** Unlike generic AI document generators, it preserves **brand, structure, styles and formulas by construction**. Built for Claude Code, Codex and compatible AI agents.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-3B82F6.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
@@ -22,7 +22,7 @@
 
 ## What is BrandDocs?
 
-**BrandDocs** is an open-source **agent-skill bundle** that turns a company's existing Office templates into reusable AI document-generation skills. Point it at one branded `.docx`, `.pptx`, or `.xlsx`; it **extracts** the brand (theme colors and fonts, named styles, the document's *structure*, layouts, cover anchors, logos and tables) into a portable **Brand Profile**. From then on, every document it **generates** is built *from the original template shell* and uses *only* the artifacts the template actually defines. Each format stays in its own lane: there is no cross-format conversion.
+**BrandDocs** is an open-source **agent-skill bundle** that learns a company's existing Office templates and generates new on-brand documents from them. Point it at one branded `.docx`, `.pptx`, or `.xlsx`; it **extracts** the brand (theme colors and fonts, named styles, the document's *structure*, layouts, cover anchors, logos and tables) into a portable **Brand Profile**. From then on, every document it **generates** is built *from the original template shell* and uses *only* the artifacts the template actually defines. Each format stays in its own lane: there is no cross-format conversion.
 
 > **The core guarantee: off-brand output is impossible by construction.** No generator ever writes a literal style name, hex color, or font: those live only in the Brand Profile, and `verify` refuses a profile that points at anything the template doesn't contain.
 
