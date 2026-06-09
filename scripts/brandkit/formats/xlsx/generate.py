@@ -569,6 +569,13 @@ class _XlsxAppearanceBackend:
     inherited-but-correct workbook/style value is never clobbered, and an empty
     appearance is a byte-identical no-op."""
 
+    # Parity ledger (Cluster E3): xlsx realizes the run-typography trio only; a
+    # captured geometry/table/numbering axis (impossible from xlsx capture today,
+    # but possible from a hand-edited profile or a future capture-before-apply
+    # increment) surfaces as an INFO ``appearance_apply_degraded`` finding instead
+    # of silently dropping.
+    realized_axes = frozenset({"font", "size_hp", "color"})
+
     def runs_of(self, target):
         return [target]
 

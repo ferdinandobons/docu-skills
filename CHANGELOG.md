@@ -6,6 +6,17 @@ All notable changes to BrandDocs are documented in this file.
 
 ### Added
 
+- **Uniform parity ledger: `appearance_apply_degraded` (Cluster E3).** Whenever a
+  resolved op carries a captured appearance axis the format's writer cannot realize,
+  the shared apply orchestration now emits ONE stable INFO finding per (role, axis)
+  (`location='<role_id>:<axis>'`, message names only role id + axis, never a brand
+  value) instead of silently dropping the captured intent. Each backend DECLARES its
+  capability (`realized_axes`: docx all six axes, pptx/xlsx the run-typography trio;
+  an undeclared backend keeps its exact prior inferred behavior), so future
+  capture-before-apply increments and hand-edited profiles surface measurably - the
+  finding feeds the cross-run `generation_history` (B4) and the L2 model. INFO-only:
+  not in `DEFAULT_L0_INVARIANTS` or `LEARNABLE_CHECKS`, can never flip a verdict;
+  every existing real profile emits nothing (byte-identical paths).
 - **Faked-heading-in-body-style detection (DOCX-first, Cluster E2).** Some templates FAKE a
   heading: a line that LOOKS like a heading (visibly larger and/or in a brand color) is authored
   with the BODY paragraph style - no heading role, no named heading style - so the deterministic

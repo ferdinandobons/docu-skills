@@ -1699,10 +1699,21 @@ class _DocxAppearanceBackend:
     docx-only raw-XML hyperlink injection (``_inject_hyperlink_run_color``) and the
     WordprocessingML token map stay outside this backend.
 
+    ``realized_axes`` declares the parity ledger (Cluster E3): docx realizes ALL six
+    appearance axes - font/size/color here, geometry via ``set_geometry``, and
+    table/numbering via the docx writers outside this orchestration
+    (``_apply_table_style`` / ``_apply_list_numbering_appearance``) - so no
+    ``appearance_apply_degraded`` finding ever fires for docx today.
+
     Cluster D1 adds the PARAGRAPH geometry hooks (``paragraphs_of`` + ``set_geometry``):
     geometry rides on ``w:pPr`` (the paragraph, not the run), applied set-only-when-
     unset per property. A profile with no captured geometry never reaches them (the op
     carries no ``appearance.geometry``), so the no-geometry path is byte-identical."""
+
+    # Parity ledger (Cluster E3): every appearance axis is realized for docx.
+    realized_axes = frozenset(
+        {"font", "size_hp", "color", "geometry", "table", "numbering"}
+    )
 
     def runs_of(self, target):
         return _all_para_runs(target)

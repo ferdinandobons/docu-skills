@@ -177,6 +177,80 @@ def op_numbering(op) -> Optional[dict]:
     return (getattr(op, "appearance", None) or {}).get("numbering")
 
 
+# The closed set of appearance AXES a resolved op can carry (the op.appearance
+# keys the resolver merges). The parity ledger (Cluster E3) compares the axes an op
+# CARRIES against the axes the format backend declares it REALIZES, so a captured
+# brand axis that a format cannot yet honor is surfaced instead of silently dropped.
+APPEARANCE_AXES: tuple[str, ...] = (
+    "font",
+    "size_hp",
+    "color",
+    "geometry",
+    "table",
+    "numbering",
+)
+
+# The axes every backend realizes today without declaring anything: the original
+# run-typography trio. Geometry is inferred from the ``paragraphs_of`` hook for a
+# backend that predates the explicit declaration.
+_BASE_REALIZED_AXES: frozenset[str] = frozenset({"font", "size_hp", "color"})
+
+
+def _realized_axes(backend) -> frozenset[str]:
+    """The appearance axes ``backend`` can realize (Cluster E3).
+
+    A backend DECLARES its capability via a ``realized_axes`` attribute (the docx
+    backend declares all six: the table/numbering axes are realized by the docx
+    writers outside this orchestration, but the declaration lives here so the parity
+    ledger has ONE source of truth). A backend without the attribute falls back to
+    the run-typography trio plus geometry-if-it-has-the-hook, so a third-party /
+    pre-E3 backend keeps its exact prior behavior."""
+    declared = getattr(backend, "realized_axes", None)
+    if declared is not None:
+        return frozenset(declared)
+    base = set(_BASE_REALIZED_AXES)
+    if hasattr(backend, "paragraphs_of"):
+        base.add("geometry")
+    return frozenset(base)
+
+
+def _record_degraded_axes(backend, op, findings: list[Finding]) -> None:
+    """Emit one INFO ``appearance_apply_degraded`` finding per captured-but-
+    unrealizable axis (Cluster E3): the uniform parity ledger.
+
+    Fires on the STRUCTURAL fact that ``op.appearance`` carries an axis the backend
+    does not declare it realizes - the captured brand intent degrades gracefully
+    instead of silently. The finding names ONLY the role id and the axis (never a
+    brand value), keyed ``location='<role_id>:<axis>'`` so cross-run recurrence
+    (B2/B4 ``generation_history``) and the L2 model can measure parity gaps.
+    INFO-only: NOT in ``DEFAULT_L0_INVARIANTS`` / ``LEARNABLE_CHECKS``, so it can
+    never flip a verdict or feed a deterministic lesson. Deduplicated per
+    ``(role, axis)`` within a run (the apply is called per paragraph/cell). A profile
+    whose axes are all realized (every existing real profile) emits NOTHING, so the
+    existing paths stay byte-identical."""
+    appearance = getattr(op, "appearance", None) or {}
+    realized = _realized_axes(backend)
+    role_id = getattr(op, "role_id", None) or "?"
+    for axis in APPEARANCE_AXES:
+        if axis in realized or not appearance.get(axis):
+            continue
+        location = f"{role_id}:{axis}"
+        if any(
+            f.check == "appearance_apply_degraded" and f.location == location
+            for f in findings
+        ):
+            continue  # one ledger entry per (role, axis) per run
+        findings.append(
+            Finding(
+                "appearance_apply_degraded",
+                schema.Severity.INFO.value,
+                f"captured appearance axis {axis!r} of role {role_id!r} is not "
+                "realizable by this format's writer; output degrades gracefully",
+                location=location,
+            )
+        )
+
+
 def resolve_run_color(
     resolver,
     token: Optional[str],
@@ -218,6 +292,11 @@ def apply_role_appearance(
     table here) yields nothing and is skipped. An empty appearance (a pre-capture
     profile) returns before touching any run, so output stays byte-identical to
     today."""
+    # Parity ledger (Cluster E3): surface any captured axis this backend cannot
+    # realize BEFORE the early return, so a table/numbering-only op on a format
+    # without those writers is still measured. Appends findings only; it never
+    # touches the document, so byte-identity is unaffected.
+    _record_degraded_axes(backend, op, findings)
     latin = op_latin(op)
     size_hp = op_size_hp(op)
     color = op_color(op)

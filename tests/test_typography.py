@@ -37,6 +37,7 @@ from brandkit.formats.docx import extract as docx_extract
 from brandkit.formats.docx import generate as docx_generate
 from brandkit.formats.docx import typography
 from brandkit.ir import model as ir
+from brandkit.common import appearance as common_appearance
 from brandkit.profile import schema
 from brandkit.profile.resolver import ProfileResolver
 from brandkit.qa import checks_deterministic
@@ -3369,6 +3370,112 @@ class TableEndToEndTest(unittest.TestCase):
             self.assertEqual(
                 checks_deterministic.check_table_targets(template, profile), []
             )
+
+
+class AppearanceApplyDegradedTest(unittest.TestCase):
+    """E3: the uniform parity ledger. A captured appearance axis the format backend
+    does not realize surfaces as ONE INFO ``appearance_apply_degraded`` finding per
+    (role, axis), naming only role id + axis; a fully-realized op emits nothing
+    (byte-identical existing paths)."""
+
+    class _TrioBackend:
+        """A pptx/xlsx-like backend: realizes only the run-typography trio."""
+
+        realized_axes = frozenset({"font", "size_hp", "color"})
+
+        def runs_of(self, target):
+            return []
+
+    class _FullBackend(_TrioBackend):
+        realized_axes = frozenset(
+            {"font", "size_hp", "color", "geometry", "table", "numbering"}
+        )
+
+    class _LegacyBackend:
+        """A pre-E3 backend with NO declaration and NO geometry hook."""
+
+        def runs_of(self, target):
+            return []
+
+    @staticmethod
+    def _op(role_id: str, appearance: dict):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(role_id=role_id, appearance=appearance)
+
+    def test_unrealizable_axis_emits_one_info_finding(self):
+        findings: list = []
+        op = self._op("table.default", {"table": {"tblLook": 32}})
+        common_appearance.apply_role_appearance(
+            self._TrioBackend(), object(), op, findings
+        )
+        self.assertEqual(len(findings), 1)
+        f = findings[0]
+        self.assertEqual(f.check, "appearance_apply_degraded")
+        self.assertEqual(f.severity, schema.Severity.INFO.value)
+        self.assertEqual(f.location, "table.default:table")
+        # The message names only role id + axis, never a brand value.
+        self.assertNotIn("32", f.message)
+
+    def test_deduplicated_per_role_axis(self):
+        findings: list = []
+        op = self._op("table.default", {"table": {"tblLook": 32}})
+        backend = self._TrioBackend()
+        common_appearance.apply_role_appearance(backend, object(), op, findings)
+        common_appearance.apply_role_appearance(backend, object(), op, findings)
+        self.assertEqual(len(findings), 1)
+
+    def test_fully_realized_backend_emits_nothing(self):
+        findings: list = []
+        op = self._op(
+            "table.default",
+            {"table": {"tblLook": 32}, "numbering": {"num_id": "2"}},
+        )
+        common_appearance.apply_role_appearance(
+            self._FullBackend(), object(), op, findings
+        )
+        self.assertEqual(findings, [])
+
+    def test_empty_appearance_emits_nothing(self):
+        findings: list = []
+        op = self._op("paragraph", {})
+        common_appearance.apply_role_appearance(
+            self._TrioBackend(), object(), op, findings
+        )
+        self.assertEqual(findings, [])
+
+    def test_legacy_backend_inference(self):
+        # No declaration + no paragraphs_of hook: geometry is NOT realized -> ledger
+        # entry; the trio stays realized -> no entry for a color-only op.
+        findings: list = []
+        op = self._op("paragraph", {"geometry": {"spacing": {"before_twips": 240}}})
+        common_appearance.apply_role_appearance(
+            self._LegacyBackend(), object(), op, findings
+        )
+        self.assertEqual([f.location for f in findings], ["paragraph:geometry"])
+        findings2: list = []
+        op2 = self._op("paragraph", {"color": {"kind": "hex", "hex": "FF0000"}})
+        common_appearance.apply_role_appearance(
+            self._LegacyBackend(), object(), op2, findings2
+        )
+        self.assertEqual(findings2, [])
+
+    def test_real_backends_declare_expected_axes(self):
+        from brandkit.formats.pptx import generate as pptx_generate
+        from brandkit.formats.xlsx import generate as xlsx_generate
+
+        self.assertEqual(
+            docx_generate.DOCX_BACKEND.realized_axes,
+            frozenset({"font", "size_hp", "color", "geometry", "table", "numbering"}),
+        )
+        for backend in (pptx_generate.PPTX_BACKEND, xlsx_generate.XLSX_BACKEND):
+            self.assertEqual(
+                backend.realized_axes, frozenset({"font", "size_hp", "color"})
+            )
+
+    def test_not_an_l0_invariant_and_not_learnable(self):
+        self.assertNotIn("appearance_apply_degraded", schema.DEFAULT_L0_INVARIANTS)
+        self.assertNotIn("appearance_apply_degraded", schema.LEARNABLE_CHECKS)
 
 
 if __name__ == "__main__":
