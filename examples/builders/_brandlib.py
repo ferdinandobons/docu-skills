@@ -29,6 +29,36 @@ _TS_RE = re.compile(
 )
 
 
+# BrandDocs theme palette as bare 6-digit hexes (no leading FF), one source of
+# truth shared by every builder's theme1.xml clrScheme rewrite.
+_BRAND_NAVY_HEX = "16213F"  # navy   -> dk1 (text)
+_BRAND_TEAL_HEX = "2B7CD3"  # teal   -> accent1 (primary) + hlink
+_BRAND_AMBER_HEX = "E0742B"  # amber  -> accent4 (danger) + accent2 + folHlink
+_BRAND_LIGHT_HEX = "EAF1FF"  # light  -> lt1 (surface)
+
+
+def brand_theme_slots() -> dict[str, str]:
+    """Frozen ``clrScheme`` slot -> 6-digit hex map for the 4 BrandDocs colors.
+
+    Additive, deterministic, side-effect free. A new helper (no existing
+    signature touched) that any builder may import to drive its in-place
+    ``theme1.xml`` clrScheme rewrite from a single source of truth, so the four
+    BrandDocs hexes can never drift apart across the .docx / .pptx / .xlsx
+    themes. Keys are the canonical DrawingML theme slots the extractor reads;
+    values are bare ``RRGGBB`` (no ``#``, no leading ``FF``). Returns a fresh
+    dict each call so a caller mutating the result can never corrupt the map.
+    """
+    return {
+        "dk1": _BRAND_NAVY_HEX,
+        "lt1": _BRAND_LIGHT_HEX,
+        "accent1": _BRAND_TEAL_HEX,
+        "accent2": _BRAND_AMBER_HEX,
+        "accent4": _BRAND_AMBER_HEX,
+        "hlink": _BRAND_TEAL_HEX,
+        "folHlink": _BRAND_AMBER_HEX,
+    }
+
+
 def rgba(hexstr: str, alpha: int = 255) -> tuple:
     """``'FF16213F'`` or ``'16213F'`` -> ``(0x16, 0x21, 0x3F, alpha)``.
 

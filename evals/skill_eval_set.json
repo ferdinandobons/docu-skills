@@ -81,21 +81,21 @@
         "conventions": {
           "indexes": [
             {
-              "index_ref": "field.8",
+              "index_ref": "field.10",
               "kind": "outline table of contents",
               "seq_id": null,
               "feeds_from_role_id": "heading.1",
               "reconcile": "regenerate"
             },
             {
-              "index_ref": "field.17",
+              "index_ref": "field.19",
               "kind": "list of tables",
               "seq_id": "Table",
               "feeds_from_role_id": "caption",
               "reconcile": "clear"
             },
             {
-              "index_ref": "field.23",
+              "index_ref": "field.25",
               "kind": "list of figures",
               "seq_id": "Figure",
               "feeds_from_role_id": "caption",

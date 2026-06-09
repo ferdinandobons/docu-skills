@@ -40,8 +40,11 @@ Run:
 
 from __future__ import annotations
 
+import io
+import zipfile
 from pathlib import Path
 
+from lxml import etree
 from openpyxl import Workbook
 from openpyxl.comments import Comment
 from openpyxl.chart import BarChart, LineChart, Reference
@@ -67,10 +70,11 @@ from openpyxl.styles import (
 )
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
-
-from _brandlib import branddocs_mark_png, freeze_ooxml
-from openpyxl.workbook.defined_name import DefinedName
+from openpyxl.worksheet.filters import AutoFilter
 from openpyxl.worksheet.table import Table, TableStyleInfo
+
+from _brandlib import branddocs_mark_png, brand_theme_slots, freeze_ooxml
+from openpyxl.workbook.defined_name import DefinedName
 
 OUT = Path(__file__).resolve().parents[1] / "templates" / "branddocs_template.xlsx"
 
@@ -126,8 +130,88 @@ def _register_named_styles(wb: Workbook) -> None:
     kpi.alignment = Alignment(horizontal="center", vertical="center")
     kpi.border = border
 
-    for style in (title, header, currency, percent, inp, kpi):
+    # Additional reusable brand cell styles (a complete date / multiple / total /
+    # subtitle / band-header system). Each is applied to a real cell below so the
+    # extractor promotes it into a cell_style role with a font/fill/border digest.
+    top_navy = Border(top=Side(style="thin", color=BRAND_NAVY))
+
+    subtitle = NamedStyle(name="BrandDocsSubtitle")
+    subtitle.font = Font(name="Arial", size=12, italic=True, color=BRAND_TEAL)
+    subtitle.alignment = Alignment(horizontal="left", vertical="center")
+
+    total = NamedStyle(name="BrandDocsTotal")
+    total.font = Font(name="Arial", size=11, bold=True, color=BRAND_NAVY)
+    total.number_format = '_($* #,##0_);_($* (#,##0);_($* "-"_);_(@_)'
+    total.border = top_navy
+
+    date = NamedStyle(name="BrandDocsDate")
+    date.font = Font(name="Calibri", size=11, color=BRAND_NAVY)
+    date.number_format = "yyyy-mm-dd"
+
+    multiple = NamedStyle(name="BrandDocsMultiple")
+    multiple.font = Font(name="Calibri", size=11, color=BRAND_NAVY)
+    multiple.number_format = "0.00x"
+
+    band_header = NamedStyle(name="BrandDocsBandHeader")
+    band_header.font = Font(name="Arial", size=11, bold=True, color=WHITE)
+    band_header.fill = PatternFill("solid", fgColor=BRAND_NAVY)
+    band_header.alignment = Alignment(horizontal="left", vertical="center")
+
+    for style in (
+        title,
+        header,
+        currency,
+        percent,
+        inp,
+        kpi,
+        subtitle,
+        total,
+        date,
+        multiple,
+        band_header,
+    ):
         wb.add_named_style(style)
+
+
+# ---------------------------------------------------------------------------
+# Per-sheet brand chrome (slim navy title band + teal rule + print header/footer).
+# ---------------------------------------------------------------------------
+def _brand_band(ws, title: str, *, last_col: int = 7, band_row: int = 1) -> None:
+    """Stamp a slim navy brand band (white sheet-title) + a teal rule below it.
+
+    Pure static fills/merges on a fixed row pair, so it surfaces in the
+    ``non_empty_cells`` / ``merged_cells`` inventories the package walker reads.
+    The band sits ABOVE the sheet's existing content rows (the body builders below
+    start at row 3+), so it is additive and never overwrites a formula/header.
+    """
+    end = get_column_letter(last_col)
+    ws.merge_cells(f"A{band_row}:{end}{band_row}")
+    title_cell = ws.cell(row=band_row, column=1, value=title)
+    title_cell.style = "BrandDocsBandHeader"
+    for col in range(1, last_col + 1):
+        ws.cell(row=band_row, column=col).fill = PatternFill(
+            "solid", fgColor=BRAND_NAVY
+        )
+    ws.row_dimensions[band_row].height = 22
+    rule_row = band_row + 1
+    for col in range(1, last_col + 1):
+        ws.cell(row=rule_row, column=col).fill = PatternFill(
+            "solid", fgColor=BRAND_TEAL
+        )
+    ws.row_dimensions[rule_row].height = 4
+
+
+def _print_chrome(ws, *, title_rows: str = "1:3") -> None:
+    """Set print header/footer live fields + repeating print-title rows.
+
+    ``&A`` (sheet name) centred, ``&D`` (date) left, ``Page &P of &N`` right -
+    literal Excel field codes (no wall-clock), and ``print_title_rows`` so the
+    brand band repeats on every printed page. Structural print metadata only.
+    """
+    ws.oddHeader.center.text = "&A"
+    ws.oddHeader.left.text = "&D"
+    ws.oddFooter.right.text = "Page &P of &N"
+    ws.print_title_rows = title_rows
 
 
 # ---------------------------------------------------------------------------
@@ -147,16 +231,17 @@ def _build_cover(wb: Workbook) -> None:
     ws.row_dimensions[1].height = 30
     ws.merge_cells("A2:G2")
     ws["A2"] = "Quarterly revenue model and executive summary"
-    ws["A2"].font = Font(name="Arial", size=12, italic=True, color=BRAND_TEAL)
-    ws["A2"].alignment = Alignment(horizontal="center")
+    ws["A2"].style = "BrandDocsSubtitle"
+    ws["A2"].alignment = Alignment(horizontal="center", vertical="center")
     ws["A4"] = "Prepared for"
     ws["B4"] = "BrandDocs Corp (synthetic demo)"
     ws["A5"] = "Reporting period"
     ws["B5"] = "FY2025 (Q1-Q4)"
-    # An ISO-date cell with a date number format (pinned, deterministic).
+    # An ISO-date cell carrying the reusable BrandDocsDate brand style (navy
+    # Calibri + yyyy-mm-dd mask), pinned and deterministic.
     ws["A6"] = "Generated on"
     ws["B6"] = "2026-01-15"
-    ws["B6"].number_format = "yyyy-mm-dd"
+    ws["B6"].style = "BrandDocsDate"
     # Three scorecard tiles make the cover read as an executive-ready workbook.
     scorecards = [
         ("D4", "FY net revenue", "=Summary!B4"),
@@ -188,6 +273,24 @@ def _build_cover(wb: Workbook) -> None:
     logo = XLImage(_logo_path())
     logo.width, logo.height = 180, 45
     ws.add_image(logo, "A9")
+    # A small color-code LEGEND describing the model conventions (real financial
+    # models annotate their color code). Styled cells, so it surfaces as
+    # non-empty cells the package walker reads.
+    ws["D11"] = "Legend"
+    ws["D11"].style = "BrandDocsBandHeader"
+    ws.merge_cells("D11:G11")
+    ws["D12"] = "Inputs"
+    ws["D12"].style = "BrandDocsInput"
+    ws["E12"] = "Blue fill = editable assumptions you fill in"
+    ws["E12"].font = Font(name="Calibri", size=10, color=BRAND_NAVY)
+    ws["D13"] = "Formulas"
+    ws["D13"].font = Font(name="Calibri", size=11, bold=True, color=BRAND_NAVY)
+    ws["E13"] = "Navy text = model formulas (do not overwrite)"
+    ws["E13"].font = Font(name="Calibri", size=10, color=BRAND_NAVY)
+    # Document the headline scorecard with a source note.
+    ws["D5"].comment = Comment(
+        "Synthetic figure - pulled live from the Summary tab.", "BrandDocs"
+    )
     ws.column_dimensions["A"].width = 18
     ws.column_dimensions["B"].width = 28
     for col in "CDEFG":
@@ -242,9 +345,57 @@ def _build_inputs(wb: Workbook) -> None:
     for r in range(4, 8):
         ws.cell(row=r, column=2).protection = Protection(locked=False)
     ws.protection.sheet = True
+    # Guided-input validations with prompts + error alerts (a fillable model).
+    # Units sold: whole number >= 0.
+    dv_units = DataValidation(
+        type="whole",
+        operator="greaterThanOrEqual",
+        formula1="0",
+        allow_blank=False,
+        showInputMessage=True,
+        showErrorMessage=True,
+        promptTitle="Units sold",
+        prompt="Enter the synthetic unit volume (whole number, 0 or more).",
+        errorTitle="Invalid units",
+        error="Units sold must be a whole number greater than or equal to 0.",
+    )
+    ws.add_data_validation(dv_units)
+    dv_units.add(ws["B4"])
+    # Discount + Tax rate: decimal between 0 and 1.
+    dv_rate = DataValidation(
+        type="decimal",
+        operator="between",
+        formula1="0",
+        formula2="1",
+        allow_blank=False,
+        showInputMessage=True,
+        showErrorMessage=True,
+        promptTitle="Rate (0-1)",
+        prompt="Enter a rate as a fraction between 0 and 1 (e.g. 0.12 for 12%).",
+        errorTitle="Invalid rate",
+        error="Rate must be a decimal between 0 and 1.",
+    )
+    ws.add_data_validation(dv_rate)
+    dv_rate.add(ws["B6"])
+    dv_rate.add(ws["B7"])
+    # CF (blanks): flag any empty input value cell so a recipient sees what is
+    # still missing (a brand-light fill on B4:B7 when blank).
+    ws.conditional_formatting.add(
+        "B4:B7",
+        Rule(
+            type="containsBlanks",
+            formula=["LEN(TRIM(B4))=0"],
+            dxf=DifferentialStyle(fill=PatternFill("solid", fgColor=BRAND_LIGHT)),
+        ),
+    )
     # Print-ready header/footer with live fields (sheet name + page x of y).
     ws.oddHeader.center.text = "&A"
     ws.oddFooter.right.text = "Page &P of &N"
+    # Source notes on every input value cell (self-documenting model).
+    for r in range(4, 8):
+        ws.cell(row=r, column=2).comment = Comment(
+            "Synthetic input - replace with your data.", "BrandDocs"
+        )
 
 
 def _build_model(wb: Workbook) -> None:
@@ -281,11 +432,21 @@ def _build_model(wb: Workbook) -> None:
         ws.cell(
             row=r, column=7, value=f"=IF($F$7=0,0,F{r}/$F$7)"
         ).number_format = "0.0%"
-    # A grand-total SUBTOTAL row 9 (col 6).
-    ws.cell(row=9, column=1, value="Subtotal (visible)")
-    ws.cell(row=9, column=6, value="=SUBTOTAL(9,F4:F6)").number_format = "#,##0"
-    # Native TABLE object over the body (header row 3 .. last data row 7).
-    table = Table(displayName="BrandDocsDataTbl", ref="A3:G7")
+    # Table TOTALS row 8: a SUBTOTAL over the FY-total column, carried inside the
+    # table object (showTotalsRow) so the native table gains a labelled total row.
+    ws.cell(row=8, column=1, value="Total").style = "BrandDocsTotal"
+    ws.cell(row=8, column=6, value="=SUBTOTAL(109,F4:F7)").style = "BrandDocsTotal"
+    # A grand-total SUBTOTAL row 10 (col 6) carrying the brand total style.
+    ws.cell(row=10, column=1, value="Subtotal (visible)").style = "BrandDocsTotal"
+    sub = ws.cell(row=10, column=6, value="=SUBTOTAL(9,F4:F6)")
+    sub.style = "BrandDocsTotal"
+    sub.number_format = "#,##0"
+    # A STRUCTURED-REFERENCE formula that reads the table's FY Total column.
+    ws.cell(
+        row=10, column=7, value="=SUM(BrandDocsDataTbl[FY Total])"
+    ).number_format = "#,##0"
+    # Native TABLE object over the body (header row 3 .. data row 7 .. totals row 8).
+    table = Table(displayName="BrandDocsDataTbl", ref="A3:G8")
     table.tableStyleInfo = TableStyleInfo(
         name="TableStyleMedium2",
         showRowStripes=True,
@@ -293,7 +454,15 @@ def _build_model(wb: Workbook) -> None:
         showFirstColumn=False,
         showLastColumn=False,
     )
+    # Mark the table's totals row so Excel renders row 8 as the table total band.
+    table.totalsRowShown = True
+    table.totalsRowCount = 1
+    # The autofilter must span the header + data rows ONLY (A3:G7); the totals row
+    # (row 8) is excluded, else Excel reports a repair-needed table.
+    table.autoFilter = AutoFilter(ref="A3:G7")
     ws.add_table(table)
+    # The totals-row label + the FY-total SUBTOTAL are authored as real cells in
+    # row 8 above; the table's totalsRow band (totalsRowShown/Count) renders them.
     # CONDITIONAL FORMATTING: color scale on the quarter grid, a CellIs rule on
     # the % column, and a formula rule that flags negative FY totals.
     ws.conditional_formatting.add(
@@ -363,13 +532,15 @@ def _build_model(wb: Workbook) -> None:
     chart.width = 14
     chart.height = 8
     # Anchor the chart below the table so it stays within the print page.
-    ws.add_chart(chart, "A11")
+    ws.add_chart(chart, "A13")
     # Contain the sheet on a single landscape page.
-    ws.print_area = "A1:G27"
+    ws.print_area = "A1:G29"
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+    # Repeating print header/footer with live fields on every printed page.
+    _print_chrome(ws, title_rows="1:3")
 
     # A second chart (line) on the Summary sheet is added there.
 
@@ -400,9 +571,27 @@ def _build_summary(wb: Workbook) -> None:
     ws["B8"].style = "BrandDocsPercent"
     ws["A9"] = "Headline KPI"
     ws["B9"] = "85% net margin on $1.45M gross"  # single-cell named output slot
+    ws["B9"].comment = Comment(
+        "Synthetic headline - derived from the model and inputs tabs.", "BrandDocs"
+    )
     ws.freeze_panes = "A4"
     ws.column_dimensions["A"].width = 22
     ws.column_dimensions["B"].width = 16
+    # CF (top10): highlight the single largest metric value among the numeric rows.
+    ws.conditional_formatting.add(
+        "B4:B8",
+        Rule(
+            type="top10",
+            rank=1,
+            dxf=DifferentialStyle(fill=PatternFill("solid", fgColor=BRAND_LIGHT)),
+        ),
+    )
+    # Repeat a small BrandDocs wordmark on the summary so the printed deliverable
+    # carries the brand identity beyond the cover (reuses the cached deterministic
+    # wordmark PNG; no fresh raster).
+    mark = XLImage(_logo_path())
+    mark.width, mark.height = 120, 30
+    ws.add_image(mark, "D1")
 
     # A LINE chart on the summary tracking Net revenue per quarter (cross-sheet
     # reference into the Model sheet), coherent with the Model bar chart.
@@ -430,6 +619,7 @@ def _build_summary(wb: Workbook) -> None:
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+    _print_chrome(ws, title_rows="1:3")
 
 
 def _build_dashboard(wb: Workbook) -> None:
@@ -485,6 +675,12 @@ def _build_dashboard(wb: Workbook) -> None:
         "B8:B11",
         DataBarRule(start_type="min", end_type="max", color=TEAL6, showValue=True),
     )
+    # CF (icon set) on the per-quarter growth column so up/flat/down reads at a
+    # glance (a second CF family on this sheet alongside the existing data bar).
+    ws.conditional_formatting.add(
+        "C9:C11",
+        IconSetRule(icon_style="3Arrows", type="percent", values=[0, 33, 67]),
+    )
 
     chart = BarChart()
     chart.title = "Net revenue"
@@ -497,13 +693,46 @@ def _build_dashboard(wb: Workbook) -> None:
     chart.width = 8.5
     chart.height = 6
     ws.add_chart(chart, "E8")
-    for col, width in zip("ABCDEFGH", (12, 12, 12, 3, 12, 12, 12, 12)):
+
+    # KPI trend mini-table (rows 15..17): one row per KPI with its Q1..Q4 cells,
+    # used as the data range for in-cell line sparklines (column F) and richer
+    # number-format masks (a signed-percent growth cell and a bps margin-delta).
+    ws["A14"] = "KPI trends"
+    ws["A14"].style = "BrandDocsBandHeader"
+    trend_headers = ("KPI", "Q1", "Q2", "Q3", "Q4", "Trend")
+    for col, label in enumerate(trend_headers, start=1):
+        ws.cell(row=15, column=col, value=label).style = "BrandDocsHeader"
+    trend_rows = [
+        ("Net revenue", 272000, 298350, 316625, 348500),
+        ("Bookings", 240000, 281000, 305000, 366000),
+        ("Active seats", 1180, 1240, 1305, 1402),
+    ]
+    for r, (label, *quarters) in enumerate(trend_rows, start=16):
+        ws.cell(row=r, column=1, value=label)
+        for c, q in enumerate(quarters, start=2):
+            ws.cell(row=r, column=c, value=q).number_format = "#,##0"
+    # Signed-percent growth + a bps margin-delta, exercising two more masks
+    # ('+0.0%;-0.0%' and '#,##0 "bps"') on real cells so the family inventory
+    # widens beyond currency/percent/thousands/date/multiple. Placed in column G
+    # of the trend block (row 16/17), clear of the merged KPI cards above.
+    ws["G15"] = "QoQ / delta"
+    ws["G15"].style = "BrandDocsHeader"
+    ws["G16"] = "=IF(B11=0,0,B11/B8-1)"
+    ws["G16"].number_format = "+0.0%;-0.0%"
+    ws["G17"] = "=ROUND((Summary!B8-0.85)*10000,0)"
+    ws["G17"].number_format = '#,##0 "bps"'
+
+    # Column D carries the KPI-trend Q3 numbers (and its "Q3" header), so it must
+    # be wide enough to avoid "###" overflow / clipped headers; keep it consistent
+    # with the other data columns at width 12 rather than the old narrow gutter.
+    for col, width in zip("ABCDEFGH", (14, 12, 12, 12, 12, 12, 12, 12)):
         ws.column_dimensions[col].width = width
     ws.print_area = "A1:H24"
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+    _print_chrome(ws, title_rows="1:2")
 
 
 def _build_scenarios(wb: Workbook) -> None:
@@ -532,9 +761,28 @@ def _build_scenarios(wb: Workbook) -> None:
     for r, row in enumerate(rows, start=6):
         for c, val in enumerate(row, start=1):
             cell = ws.cell(row=r, column=c, value=val)
-            if c in (2, 3):
-                cell.style = "BrandDocsPercent" if c == 3 else "BrandDocsInput"
-                cell.number_format = "0.0%" if c == 3 else "0.00x"
+            if c == 2:
+                # The revenue multiplier carries the reusable BrandDocsMultiple
+                # brand style (navy Calibri + '0.00x' valuation-multiple mask).
+                cell.style = "BrandDocsMultiple"
+            elif c == 3:
+                cell.style = "BrandDocsPercent"
+                cell.number_format = "0.0%"
+    # A custom-formula validation on the selector keeps it within the listed set
+    # (guards a typed value), with an input prompt + error alert.
+    dv_custom = DataValidation(
+        type="custom",
+        formula1="=COUNTIF($A$6:$A$8,$B$3)>0",
+        allow_blank=False,
+        showInputMessage=True,
+        showErrorMessage=True,
+        promptTitle="Scenario",
+        prompt="Pick a scenario that exists in the scenario table below.",
+        errorTitle="Unknown scenario",
+        error="The scenario must match one of Base / Upside / Downside.",
+    )
+    ws.add_data_validation(dv_custom)
+    dv_custom.add(ws["B3"])
     ws["A10"] = "Scenario revenue"
     ws["B10"] = "=Summary!B4*INDEX(B6:B8,MATCH($B$3,A6:A8,0))"
     ws["B10"].number_format = "#,##0"
@@ -542,7 +790,16 @@ def _build_scenarios(wb: Workbook) -> None:
     ws["B11"] = "=Summary!B8+INDEX(C6:C8,MATCH($B$3,A6:A8,0))"
     ws["B11"].number_format = "0.0%"
     table = Table(displayName="BrandDocsScenarioTbl", ref="A5:D8")
-    table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
+    # The Scenarios table wears the CUSTOM BrandDocsTableStyle (branded dxf header /
+    # stripe / total bands); the Model + Dashboard tables stay on TableStyleMedium2
+    # so both a custom and a built-in table style appear in the inventory.
+    table.tableStyleInfo = TableStyleInfo(
+        name="BrandDocsTableStyle",
+        showRowStripes=True,
+        showColumnStripes=False,
+        showFirstColumn=False,
+        showLastColumn=False,
+    )
     ws.add_table(table)
     for col, width in zip("ABCD", (18, 18, 16, 24)):
         ws.column_dimensions[col].width = width
@@ -550,6 +807,7 @@ def _build_scenarios(wb: Workbook) -> None:
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+    _print_chrome(ws, title_rows="1:5")
 
 
 def _build_data(wb: Workbook) -> None:
@@ -565,16 +823,52 @@ def _build_data(wb: Workbook) -> None:
     ]
     for i, (d, region, prod, amt) in enumerate(demo):
         r = 2 + i
-        dc = ws.cell(row=r, column=1, value=d)
-        dc.number_format = "yyyy-mm-dd"
+        # The date column carries the reusable BrandDocsDate brand style.
+        ws.cell(row=r, column=1, value=d).style = "BrandDocsDate"
         ws.cell(row=r, column=2, value=region)
         ws.cell(row=r, column=3, value=prod)
         ac = ws.cell(row=r, column=4, value=amt)
         ac.number_format = '_($* #,##0_);_($* (#,##0);_($* "-"_);_(@_)'
-    # A total row with a SUM the generator must preserve.
-    ws.cell(row=5, column=3, value="Total")
-    ws.cell(row=5, column=4, value="=SUM(D2:D4)").number_format = "#,##0"
+    # A total row with a SUM the generator must preserve (brand total style).
+    ws.cell(row=5, column=3, value="Total").style = "BrandDocsTotal"
+    tot = ws.cell(row=5, column=4, value="=SUM(D2:D4)")
+    tot.style = "BrandDocsTotal"
+    tot.number_format = "#,##0"
     ws.freeze_panes = "A2"
+    # A date validation on the date column with an input prompt + error alert.
+    dv_date = DataValidation(
+        type="date",
+        operator="greaterThanOrEqual",
+        formula1="2000-01-01",
+        allow_blank=False,
+        showInputMessage=True,
+        showErrorMessage=True,
+        promptTitle="Transaction date",
+        prompt="Enter the transaction date (ISO yyyy-mm-dd).",
+        errorTitle="Invalid date",
+        error="Date must be on or after 2000-01-01.",
+    )
+    ws.add_data_validation(dv_date)
+    dv_date.add("A2:A4")
+    # CF families spread to the Data sheet: flag duplicate region values and
+    # highlight the 'Widget' product rows (containsText), with brand dxf fills.
+    ws.conditional_formatting.add(
+        "B2:B4",
+        Rule(
+            type="duplicateValues",
+            dxf=DifferentialStyle(fill=PatternFill("solid", fgColor=BRAND_LIGHT)),
+        ),
+    )
+    ws.conditional_formatting.add(
+        "C2:C4",
+        Rule(
+            type="containsText",
+            operator="containsText",
+            text="Widget",
+            formula=['NOT(ISERROR(SEARCH("Widget",C2)))'],
+            dxf=DifferentialStyle(fill=PatternFill("solid", fgColor=BRAND_LIGHT)),
+        ),
+    )
     for col, w in zip("ABCD", (14, 12, 14, 16)):
         ws.column_dimensions[col].width = w
 
@@ -603,6 +897,13 @@ def _add_named_ranges(wb: Workbook) -> None:
     }
     for name in sorted(defns):
         wb.defined_names.add(DefinedName(name, attr_text=defns[name]))
+    # A SHEET-SCOPED defined name (local to the Model sheet) pointing at the FY
+    # total cell, alongside the workbook-scope names above. localSheetId is the
+    # 0-based index of the Model worksheet, so the name resolves only on that tab.
+    model_idx = wb.sheetnames.index("Model")
+    wb["Model"].defined_names.add(
+        DefinedName("q_total", attr_text="Model!$F$7", localSheetId=model_idx)
+    )
 
 
 _LOGO_CACHE: Path | None = None
@@ -625,6 +926,245 @@ def _logo_path() -> Path:
     return _LOGO_CACHE
 
 
+# ---------------------------------------------------------------------------
+# Raw-package post-processing (parts openpyxl's object model cannot author):
+#   * theme1.xml a:clrScheme + a:fontScheme  -> the workbook-level BrandDocs palette
+#   * styles.xml  custom dxf-backed table style 'BrandDocsTableStyle'
+#   * the Dashboard sheet's x14 sparklineGroups (in-cell line trends)
+# All three are STATIC rewrites of an existing saved part (constants only, no
+# wall-clock), performed BEFORE freeze_ooxml pins the timestamps. The steps are
+# order-stable, so two builds stay byte-identical.
+# ---------------------------------------------------------------------------
+_A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+_S_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+_X14_NS = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+_XM_NS = "http://schemas.microsoft.com/office/excel/2006/main"
+_REVISION_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+# Brand hexes (bare RRGGBB) for the raw-XML parts, sourced from the shared
+# _brandlib slot map so the .xlsx theme can never drift from the .docx/.pptx one.
+_SLOTS = brand_theme_slots()
+_NAVY = _SLOTS["dk1"]  # 16213F
+_TEAL = _SLOTS["accent1"]  # 2B7CD3
+_AMBER = _SLOTS["accent2"]  # E0742B
+_LIGHTHEX = _SLOTS["lt1"]  # EAF1FF
+
+# Full BrandDocs clrScheme: navy text, white/light surfaces, teal primary, amber
+# danger, a light tint + two supporting blues for accent3-6, teal/navy hyperlinks.
+_CLRSCHEME = {
+    "dk1": _NAVY,
+    "lt1": "FFFFFF",
+    "dk2": _TEAL,
+    "lt2": _LIGHTHEX,
+    "accent1": _TEAL,
+    "accent2": _AMBER,
+    "accent3": "DCE7FF",
+    "accent4": "5778B0",
+    "accent5": "9CC0F0",
+    "accent6": "C7912B",
+    "hlink": _TEAL,
+    "folHlink": _NAVY,
+}
+
+
+def _rewrite_theme(xml: bytes) -> bytes:
+    """Rewrite theme1.xml's a:clrScheme to the BrandDocs palette + Arial/Calibri.
+
+    dk1/lt1 are authored as plain srgbClr (no sysClr), so the parsed slot carries
+    the brand hex directly. majorFont latin -> Arial, minorFont latin -> Calibri.
+    """
+    root = etree.fromstring(xml)
+
+    def a(tag: str) -> str:
+        return f"{{{_A_NS}}}{tag}"
+
+    scheme = root.find(f".//{a('clrScheme')}")
+    if scheme is not None:
+        for slot, hexval in _CLRSCHEME.items():
+            node = scheme.find(a(slot))
+            if node is None:
+                continue
+            for child in list(node):
+                node.remove(child)
+            srgb = etree.SubElement(node, a("srgbClr"))
+            srgb.set("val", hexval)
+    font_scheme = root.find(f".//{a('fontScheme')}")
+    if font_scheme is not None:
+        major = font_scheme.find(a("majorFont"))
+        minor = font_scheme.find(a("minorFont"))
+        for fonts, face in ((major, "Arial"), (minor, "Calibri")):
+            if fonts is None:
+                continue
+            latin = fonts.find(a("latin"))
+            if latin is None:
+                latin = etree.SubElement(fonts, a("latin"))
+            latin.set("typeface", face)
+    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+
+
+# Custom table-style dxf bands (header navy/white-bold, first-row stripe brand
+# light, totals teal/white-bold). Injected into styles.xml as new <dxf> entries
+# plus a <tableStyle name="BrandDocsTableStyle"> referencing them.
+def _inject_table_style(xml: bytes) -> bytes:
+    """Add the BrandDocsTableStyle (header/stripe/total dxf bands) to styles.xml."""
+    root = etree.fromstring(xml)
+
+    def s(tag: str) -> str:
+        return f"{{{_S_NS}}}{tag}"
+
+    # 1) Append three brand dxfs (header / first-row-stripe / total) and remember
+    #    their indices (dxfId is the 0-based position in <dxfs>).
+    dxfs = root.find(s("dxfs"))
+    if dxfs is None:
+        dxfs = etree.Element(s("dxfs"))
+        # <dxfs> sits just before <tableStyles> in the schema order; insert near end.
+        root.append(dxfs)
+    base = len(dxfs)
+
+    def _band_dxf(font_hex: str | None, fill_hex: str, bold: bool) -> None:
+        dxf = etree.SubElement(dxfs, s("dxf"))
+        if font_hex is not None:
+            font = etree.SubElement(dxf, s("font"))
+            if bold:
+                etree.SubElement(font, s("b"))
+            etree.SubElement(font, s("color")).set("rgb", "FF" + font_hex)
+        fill = etree.SubElement(dxf, s("fill"))
+        pattern = etree.SubElement(fill, s("patternFill"))
+        etree.SubElement(pattern, s("fgColor")).set("rgb", "FF" + fill_hex)
+        etree.SubElement(pattern, s("bgColor")).set("rgb", "FF" + fill_hex)
+
+    _band_dxf("FFFFFF", _NAVY, True)  # header band
+    _band_dxf(None, _LIGHTHEX, False)  # first-row stripe
+    _band_dxf("FFFFFF", _TEAL, True)  # totals band
+    header_id, stripe_id, total_id = base, base + 1, base + 2
+    dxfs.set("count", str(len(dxfs)))
+
+    # 2) Register the named tableStyle referencing those dxfs.
+    table_styles = root.find(s("tableStyles"))
+    if table_styles is None:
+        table_styles = etree.SubElement(root, s("tableStyles"))
+    style = etree.SubElement(table_styles, s("tableStyle"))
+    style.set("name", "BrandDocsTableStyle")
+    style.set("pivot", "0")
+    style.set("count", "3")
+    for etype, dxf_id in (
+        ("headerRow", header_id),
+        ("firstRowStripe", stripe_id),
+        ("totalRow", total_id),
+    ):
+        el = etree.SubElement(style, s("tableStyleElement"))
+        el.set("type", etype)
+        el.set("dxfId", str(dxf_id))
+    existing = int(table_styles.get("count", "0") or "0")
+    table_styles.set("count", str(existing + 1))
+    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+
+
+# In-cell line sparklines over the Dashboard KPI-trend mini-table (one group per
+# KPI row across its Q1..Q4 cells, drawn in column F). openpyxl has no sparkline
+# model, so the x14 extension is injected into the sheet part directly.
+_SPARKLINES = [
+    ("F16", "B16:E16"),
+    ("F17", "B17:E17"),
+    ("F18", "B18:E18"),
+]
+
+
+def _inject_sparklines(xml: bytes) -> bytes:
+    """Append an x14 sparklineGroups extension to the Dashboard worksheet part.
+
+    The injected subtree carries an EXPLICIT ``nsmap`` (``x14`` + ``xm`` prefixes)
+    declared once on the ``sparklineGroups`` element, so the serialization is valid
+    and byte-stable (no per-element auto-prefixing, no reserved-namespace binding).
+    """
+    root = etree.fromstring(xml)
+
+    def s(tag: str) -> str:
+        return f"{{{_S_NS}}}{tag}"
+
+    def x14(tag: str) -> str:
+        return f"{{{_X14_NS}}}{tag}"
+
+    def xm(tag: str) -> str:
+        return f"{{{_XM_NS}}}{tag}"
+
+    ext_lst = root.find(s("extLst"))
+    if ext_lst is None:
+        ext_lst = etree.SubElement(root, s("extLst"))
+    ext = etree.SubElement(ext_lst, s("ext"))
+    ext.set(f"{{{_REVISION_NS}}}id", "rIdSparkline")
+    ext.set("uri", "{05C60535-1F16-4fd2-B633-F4F36F0B64E0}")
+    groups = etree.SubElement(
+        ext, x14("sparklineGroups"), nsmap={"x14": _X14_NS, "xm": _XM_NS}
+    )
+    for loc, data_range in _SPARKLINES:
+        group = etree.SubElement(groups, x14("sparklineGroup"))
+        group.set("displayEmptyCellsAs", "gap")
+        group.set("type", "line")
+        etree.SubElement(group, x14("colorSeries")).set("rgb", "FF" + _TEAL)
+        etree.SubElement(group, x14("colorNegative")).set("rgb", "FF" + _AMBER)
+        etree.SubElement(group, x14("colorMarkers")).set("rgb", "FF" + _NAVY)
+        sparks = etree.SubElement(group, x14("sparklines"))
+        spark = etree.SubElement(sparks, x14("sparkline"))
+        etree.SubElement(spark, xm("f")).text = f"Dashboard!{data_range}"
+        etree.SubElement(spark, xm("sqref")).text = loc
+    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+
+
+def _sheet_part_for(out: Path, sheet_name: str) -> str:
+    """Resolve a worksheet display name to its ``xl/worksheets/sheetN.xml`` part.
+
+    Reads workbook.xml + its rels so the mapping is robust to sheet reordering
+    (never hardcodes sheetN). Returns the part path (without leading slash).
+    """
+    with zipfile.ZipFile(out) as z:
+        wbxml = etree.fromstring(z.read("xl/workbook.xml"))
+        rels = etree.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+    r_ns = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    s_ns = _S_NS
+    rid = None
+    for sheet in wbxml.find(f"{{{s_ns}}}sheets"):
+        if sheet.get("name") == sheet_name:
+            rid = sheet.get(f"{{{r_ns}}}id")
+            break
+    if rid is None:
+        raise KeyError(f"sheet {sheet_name!r} not found in workbook.xml")
+    target = None
+    for rel in rels:
+        if rel.get("Id") == rid:
+            target = rel.get("Target")
+            break
+    if target is None:
+        raise KeyError(f"relationship {rid!r} not found")
+    target = target.lstrip("/")
+    if not target.startswith("xl/"):
+        target = "xl/" + target
+    return target
+
+
+def _post_process_package(out: Path) -> None:
+    """Apply the static raw-XML rewrites in a single deterministic zip rewrite."""
+    dashboard_part = _sheet_part_for(out, "Dashboard")
+    with open(out, "rb") as fh:
+        data = fh.read()
+    buf = io.BytesIO()
+    with (
+        zipfile.ZipFile(io.BytesIO(data)) as zin,
+        zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout,
+    ):
+        for info in zin.infolist():
+            payload = zin.read(info.filename)
+            if info.filename == "xl/theme/theme1.xml":
+                payload = _rewrite_theme(payload)
+            elif info.filename == "xl/styles.xml":
+                payload = _inject_table_style(payload)
+            elif info.filename == dashboard_part:
+                payload = _inject_sparklines(payload)
+            zout.writestr(info, payload)
+    with open(out, "wb") as fh:
+        fh.write(buf.getvalue())
+
+
 def build(out: Path = OUT) -> Path:
     wb = Workbook()
     # Drop the default sheet; we author named sheets in a deliberate order.
@@ -642,6 +1182,9 @@ def build(out: Path = OUT) -> Path:
     wb.calculation.fullCalcOnLoad = True
     out.parent.mkdir(parents=True, exist_ok=True)
     wb.save(out)
+    # Static raw-XML enrichments openpyxl cannot model (theme palette/fonts, the
+    # custom dxf table style, the in-cell sparklines), BEFORE freeze_ooxml.
+    _post_process_package(out)
     freeze_ooxml(out)
     return out
 
