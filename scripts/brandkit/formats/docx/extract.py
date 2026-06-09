@@ -32,6 +32,13 @@ def extract(
     # the named styles/theme never carry) into role.appearance + theme.fonts.body.
     # Additive and deterministic: a template with no dominant direct font is a no-op.
     typography.capture_fonts(doc, role_registry, theme)
+    # Detect faked-heading-in-body-style candidates (Cluster E2): a body-style run
+    # whose captured size/color is a clear OUTLIER vs the just-captured dominant body
+    # appearance is surfaced as a ``theme.pseudo_headings`` fact for the model to
+    # adjudicate (promote onto a real heading role via comprehension). DOCX-FIRST and
+    # additive: a uniform body leaves it absent (no-op, byte-identical comprehend bundle
+    # + generation). MUST run after capture_fonts so the body dominant exists.
+    typography.capture_pseudo_headings(doc, role_registry, theme)
     # Capture the brand PALETTE (theme.palette): the UNDERSTAND half of model-driven
     # color, built from observed facts only (theme slots, run colors incl. a low-floor
     # accent aggregation, per-role appearance colors, link colors). Additive and

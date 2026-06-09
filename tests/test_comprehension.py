@@ -1775,5 +1775,279 @@ class GenerationHistoryBundleTest(unittest.TestCase):
         )
 
 
+def _profile_with_heading_and_pseudo() -> dict:
+    """A docx profile carrying a declared heading role and a SURFACED pseudo_heading
+    fact (a body-style size/color outlier the detector found), so a promotion has both
+    a real target and a real ref to bind to (Cluster E2)."""
+    prof = _docx_profile_with_inventory()
+    prof["roles"] = {
+        "_index": ["heading.1", "paragraph"],
+        "heading.1": {
+            "resolver": {
+                "type": "named_style",
+                "style_id": "Heading1",
+                "style_name": "Heading 1",
+            },
+            "appearance": {},
+        },
+        "paragraph": {
+            "resolver": {"type": "named_style", "style_id": "Normal"},
+            "appearance": {},
+        },
+    }
+    prof["theme"]["pseudo_headings"] = [
+        {
+            "ref": "body_run_3",
+            "size_hp": 44,
+            "color": {"kind": "theme", "theme": "accent1"},
+            "evidence": "size 44hp vs dominant body 24hp; off-body color accent1 vs body text1",
+        }
+    ]
+    return prof
+
+
+class PromoteAppearanceSinkTest(unittest.TestCase):
+    """E2: the model-adjudicated faked-heading promotion sink
+    (`comprehension.promote_appearance`)."""
+
+    def test_empty_comprehension_has_promote_appearance_default(self):
+        self.assertEqual(schema.empty_comprehension()["promote_appearance"], [])
+
+    def test_valid_promotion_derives_captured_appearance(self):
+        prof = _profile_with_heading_and_pseudo()
+        comp = {
+            "promote_appearance": [
+                {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.1"}
+            ]
+        }
+        res = comp_mod.merge(prof, comp)
+        self.assertTrue(res.ok, res.problems)
+        ap = prof["roles"]["heading.1"]["appearance"]
+        # The CAPTURED outlier size/color are copied onto the heading role (the engine
+        # authors nothing - these are the detector's facts about the template).
+        self.assertEqual(ap["size_hp"], 44)
+        self.assertEqual(ap["color"], {"kind": "theme", "theme": "accent1"})
+        # The canonical comprehension carries only the two NAMED ids (no size/color).
+        entry = prof["comprehension"]["promote_appearance"][0]
+        self.assertEqual(
+            entry, {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.1"}
+        )
+
+    def test_promotion_overwrites_existing_role_size(self):
+        prof = _profile_with_heading_and_pseudo()
+        prof["roles"]["heading.1"]["appearance"] = {"size_hp": 22}
+        comp = {
+            "promote_appearance": [
+                {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.1"}
+            ]
+        }
+        res = comp_mod.merge(prof, comp)
+        self.assertTrue(res.ok, res.problems)
+        self.assertEqual(prof["roles"]["heading.1"]["appearance"]["size_hp"], 44)
+
+    def test_size_only_outlier_writes_no_color(self):
+        prof = _profile_with_heading_and_pseudo()
+        prof["theme"]["pseudo_headings"] = [
+            {"ref": "body_run_3", "size_hp": 44, "evidence": "size 44hp vs 24hp"}
+        ]
+        comp = {
+            "promote_appearance": [
+                {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.1"}
+            ]
+        }
+        res = comp_mod.merge(prof, comp)
+        self.assertTrue(res.ok, res.problems)
+        ap = prof["roles"]["heading.1"]["appearance"]
+        self.assertEqual(ap["size_hp"], 44)
+        self.assertNotIn("color", ap)  # axes are independent
+
+    def test_unsurfaced_ref_is_rejected(self):
+        prof = _profile_with_heading_and_pseudo()
+        res = comp_mod.merge(
+            prof,
+            {
+                "promote_appearance": [
+                    {"pseudo_heading_ref": "body_run_99", "target_role_id": "heading.1"}
+                ]
+            },
+        )
+        self.assertFalse(res.ok)
+        self.assertEqual(prof["comprehension"]["status"], "rejected")
+        self.assertTrue(
+            any("body_run_99" in p and "pseudo_heading" in p for p in res.problems),
+            res.problems,
+        )
+        # Nothing derived onto the role on rejection.
+        self.assertEqual(prof["roles"]["heading.1"]["appearance"], {})
+
+    def test_non_heading_target_is_rejected(self):
+        prof = _profile_with_heading_and_pseudo()
+        res = comp_mod.merge(
+            prof,
+            {
+                "promote_appearance": [
+                    {"pseudo_heading_ref": "body_run_3", "target_role_id": "paragraph"}
+                ]
+            },
+        )
+        self.assertFalse(res.ok)
+        self.assertTrue(
+            any("paragraph" in p and "heading" in p for p in res.problems), res.problems
+        )
+
+    def test_undeclared_target_is_rejected(self):
+        prof = _profile_with_heading_and_pseudo()
+        res = comp_mod.merge(
+            prof,
+            {
+                "promote_appearance": [
+                    {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.9"}
+                ]
+            },
+        )
+        self.assertFalse(res.ok)
+        self.assertTrue(
+            any("heading.9" in p and "declared" in p for p in res.problems),
+            res.problems,
+        )
+
+    def test_duplicate_pair_is_rejected(self):
+        prof = _profile_with_heading_and_pseudo()
+        res = comp_mod.merge(
+            prof,
+            {
+                "promote_appearance": [
+                    {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.1"},
+                    {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.1"},
+                ]
+            },
+        )
+        self.assertFalse(res.ok)
+        self.assertTrue(
+            any("duplicate" in p.lower() for p in res.problems), res.problems
+        )
+
+    def test_model_authored_size_is_rejected_at_shape(self):
+        # The model may NAME only; a size/color in the entry is rejected (the engine is
+        # the sole author of the promoted value).
+        prof = _profile_with_heading_and_pseudo()
+        prof["comprehension"]["status"] = "present"
+        prof["comprehension"]["promote_appearance"] = [
+            {
+                "pseudo_heading_ref": "body_run_3",
+                "target_role_id": "heading.1",
+                "size_hp": 99,
+            }
+        ]
+        problems = schema.validate(prof)
+        self.assertTrue(
+            any("size_hp" in p and "must not be authored" in p for p in problems),
+            problems,
+        )
+
+    def test_into_empty_pseudo_headings_is_error_not_skipped(self):
+        # Fail-closed on empty, same rule as anchor/index/region/palette.
+        prof = _profile_with_heading_and_pseudo()
+        prof["theme"].pop("pseudo_headings")
+        res = comp_mod.merge(
+            prof,
+            {
+                "promote_appearance": [
+                    {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.1"}
+                ]
+            },
+        )
+        self.assertFalse(res.ok)
+        self.assertTrue(
+            any("body_run_3" in p and "pseudo_heading" in p for p in res.problems),
+            res.problems,
+        )
+
+    def test_canonicalize_sorts_and_round_trips_byte_identical(self):
+        prof_a = _profile_with_heading_and_pseudo()
+        prof_a["roles"]["_index"].append("heading.2")
+        prof_a["roles"]["heading.2"] = {
+            "resolver": {"type": "named_style", "style_id": "Heading2"},
+            "appearance": {},
+        }
+        prof_a["theme"]["pseudo_headings"].append(
+            {"ref": "body_run_7", "size_hp": 56, "evidence": "size 56hp vs 24hp"}
+        )
+        prof_b = json.loads(json.dumps(prof_a))
+        comp = {
+            "promote_appearance": [
+                # Deliberately out of sorted order.
+                {"pseudo_heading_ref": "body_run_7", "target_role_id": "heading.2"},
+                {"pseudo_heading_ref": "body_run_3", "target_role_id": "heading.1"},
+            ]
+        }
+        res_a = comp_mod.merge(
+            prof_a, dict(comp, promote_appearance=list(comp["promote_appearance"]))
+        )
+        self.assertTrue(res_a.ok, res_a.problems)
+        sorted_refs = [
+            e["pseudo_heading_ref"]
+            for e in prof_a["comprehension"]["promote_appearance"]
+        ]
+        self.assertEqual(sorted_refs, ["body_run_3", "body_run_7"])
+        # Idempotent + order-independent: a second profile merges byte-identical.
+        comp_mod.merge(
+            prof_b, dict(comp, promote_appearance=list(comp["promote_appearance"]))
+        )
+        self.assertEqual(
+            json.dumps(prof_a["comprehension"], sort_keys=True),
+            json.dumps(prof_b["comprehension"], sort_keys=True),
+        )
+        before = json.dumps(prof_a["comprehension"], sort_keys=True)
+        comp_mod.merge(
+            prof_a, dict(comp, promote_appearance=list(comp["promote_appearance"]))
+        )
+        self.assertEqual(before, json.dumps(prof_a["comprehension"], sort_keys=True))
+
+    def test_empty_promotion_is_a_noop(self):
+        prof = _profile_with_heading_and_pseudo()
+        res = comp_mod.merge(prof, {})
+        self.assertTrue(res.ok, res.problems)
+        self.assertEqual(prof["comprehension"]["promote_appearance"], [])
+        # No appearance derived onto the heading role.
+        self.assertEqual(prof["roles"]["heading.1"]["appearance"], {})
+
+
+class PromoteAppearanceBundleTest(unittest.TestCase):
+    """E2: the pseudo_heading facts surface in the bundle when the detector found
+    candidates, and are ABSENT (byte-identical) otherwise."""
+
+    def test_bundle_includes_pseudo_headings_when_present(self):
+        prof = _profile_with_heading_and_pseudo()
+        bundle = comp_mod.comprehend_input_bundle(prof)
+        self.assertIn("pseudo_headings", bundle["facts"])
+        facts = bundle["facts"]["pseudo_headings"]
+        self.assertEqual(facts[0]["ref"], "body_run_3")
+        self.assertEqual(facts[0]["size_hp"], 44)
+        self.assertEqual(facts[0]["color"], {"kind": "theme", "theme": "accent1"})
+
+    def test_bundle_byte_identical_without_pseudo_headings(self):
+        prof = _docx_profile_with_inventory()  # no theme.pseudo_headings
+        base = comp_mod.comprehend_input_bundle(prof)
+        self.assertNotIn("pseudo_headings", base["facts"])
+        # Adding an empty list still adds NO key (byte-identical).
+        prof2 = _docx_profile_with_inventory()
+        prof2["theme"]["pseudo_headings"] = []
+        bundle = comp_mod.comprehend_input_bundle(prof2)
+        self.assertNotIn("pseudo_headings", bundle["facts"])
+        self.assertEqual(
+            json.dumps(bundle, sort_keys=True), json.dumps(base, sort_keys=True)
+        )
+
+    def test_pseudo_heading_facts_are_sorted_by_ref(self):
+        prof = _profile_with_heading_and_pseudo()
+        prof["theme"]["pseudo_headings"] = [
+            {"ref": "body_run_9", "size_hp": 56, "evidence": "x"},
+            {"ref": "body_run_2", "size_hp": 44, "evidence": "y"},
+        ]
+        facts = comp_mod.comprehend_input_bundle(prof)["facts"]["pseudo_headings"]
+        self.assertEqual([f["ref"] for f in facts], ["body_run_2", "body_run_9"])
+
+
 if __name__ == "__main__":
     unittest.main()

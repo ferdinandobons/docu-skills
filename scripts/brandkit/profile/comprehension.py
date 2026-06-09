@@ -150,8 +150,47 @@ def comprehend_input_bundle(
     if history:
         facts["generation_history"] = history
 
+    # E2: only attach the faked-heading candidates when the detector surfaced any, so
+    # the no-candidate bundle stays byte-identical (same pattern as B4 above). The
+    # facts are READ-ONLY: the model adjudicates a promotion via promote_appearance;
+    # they never change generation on their own.
+    pseudo_headings = _pseudo_heading_facts(profile)
+    if pseudo_headings:
+        facts["pseudo_headings"] = pseudo_headings
+
     excerpt = _collect_excerpt(profile, catalog, excerpt_chars)
     return {"facts": facts, "excerpt": excerpt}
+
+
+def _pseudo_heading_facts(profile: dict) -> list[dict]:
+    """The detected faked-heading-in-body-style candidates the model adjudicates (E2).
+
+    Read from ``theme.pseudo_headings`` (written deterministically at extract by the
+    docx detector ``capture_pseudo_headings``): each fact is ``{ref, size_hp?, color?,
+    evidence}`` carrying a stable structural ref, the run's OWN captured outlier size /
+    color (a FACT about the template, never a value the model authors), and coarse,
+    brand-text-free evidence. The model NAMES a ``ref`` + a declared heading role in
+    ``promote_appearance``; the engine copies the captured size/color. Sorted by
+    ``ref`` (deterministic); empty when the detector found no body-style outlier
+    (then the bundle omits the key, byte-identical to the pre-E2 shape)."""
+    pseudo = (profile.get("theme") or {}).get("pseudo_headings")
+    if not isinstance(pseudo, list):
+        return []
+    out: list[dict] = []
+    for entry in pseudo:
+        if not isinstance(entry, dict):
+            continue
+        ref = entry.get("ref")
+        if not isinstance(ref, str) or not ref:
+            continue
+        fact: dict = {"ref": ref}
+        if entry.get("size_hp") is not None:
+            fact["size_hp"] = entry["size_hp"]
+        if isinstance(entry.get("color"), dict):
+            fact["color"] = entry["color"]
+        fact["evidence"] = entry.get("evidence")
+        out.append(fact)
+    return sorted(out, key=lambda f: str(f.get("ref")))
 
 
 def _generation_history_facts(prior_reports: Optional[list]) -> list[dict]:
@@ -612,6 +651,100 @@ def check_triage(profile: dict, comp: dict) -> list[str]:
     return problems
 
 
+def surface_pseudo_headings(profile: dict) -> dict:
+    """The detected faked-heading candidates, keyed by their structural ref (E2).
+
+    The ``pseudo_heading_ref`` an adjudication NAMES is an INTERNAL structural id from
+    the detector's own run enumeration (``body_run_{n}``), NOT a surfaced inventory ref
+    like an anchor/field/region (those live in ``surface.<kind>``). It is validated
+    fail-closed by :func:`check_promote_appearance` against THIS map - the detector's
+    own output, stored at extract under ``theme.pseudo_headings``. Returns
+    ``{ref: {size_hp?, color?, evidence}}``; empty (so every promotion fails closed)
+    when the detector found no candidate or the kind has no detector (pptx/xlsx)."""
+    pseudo = (profile.get("theme") or {}).get("pseudo_headings")
+    out: dict[str, dict] = {}
+    if not isinstance(pseudo, list):
+        return out
+    for entry in pseudo:
+        if isinstance(entry, dict):
+            ref = entry.get("ref")
+            if isinstance(ref, str) and ref:
+                out[ref] = entry
+    return out
+
+
+def check_promote_appearance(profile: dict, comp: dict) -> list[str]:
+    """Fail-closed validation of ``comprehension.promote_appearance`` (Cluster E2).
+
+    Shape is checked by ``schema._validate_comp_promote_appearance`` (each entry has a
+    string ``pseudo_heading_ref`` + ``target_role_id`` and authors no size/color). This
+    enforces what shape cannot, reject-never-skip, mirroring :func:`check_triage`:
+
+      - each ``pseudo_heading_ref`` MUST be a ref the detector SURFACED (a member of
+        the ``theme.pseudo_headings`` map), FAIL-CLOSED on an empty set (same rule as
+        anchor/index/region/palette refs): the model can never invent a candidate the
+        deterministic detector did not find;
+      - each ``target_role_id`` MUST be a DECLARED role AND its family must be
+        ``heading`` (a promotion is for a real heading the template faked; a non-heading
+        target is rejected so a promoted size/color can never leak onto a body role);
+      - ``(pseudo_heading_ref, target_role_id)`` is UNIQUE across the proposal (the same
+        promotion twice is ambiguous), mirroring triage's ``(check, location)``.
+
+    The model NAMES only a surfaced ref + a declared heading role; it authors no
+    size/color, so a validated promotion cannot widen the brand guarantee. The promoted
+    appearance is the CAPTURED outlier value (``_derive_promote_appearance`` copies it),
+    re-validated SHELL-BACKED by ``check_appearance_targets``.
+
+    Returns ``[]`` when ``comp`` is absent / status != present (same status gate as
+    :func:`check_membership`)."""
+    if not isinstance(comp, dict):
+        return []
+    status = comp.get("status")
+    if status not in (None, schema.ComprehensionStatus.PRESENT.value):
+        return []
+    promote = comp.get("promote_appearance")
+    if not isinstance(promote, list) or not promote:
+        return []
+
+    surfaced = set(surface_pseudo_headings(profile))
+    role_ids = set(schema.list_role_ids(profile))
+
+    problems: list[str] = []
+    seen: set[tuple] = set()
+    for i, entry in enumerate(promote):
+        if not isinstance(entry, dict):
+            continue  # shape validator already flags
+        path = f"comprehension.promote_appearance[{i}]"
+        ref = entry.get("pseudo_heading_ref")
+        if ref not in surfaced:
+            problems.append(
+                f"{path}.pseudo_heading_ref: {ref!r} not in the surfaced "
+                f"pseudo_headings inventory {sorted(surfaced)}"
+            )
+        target = entry.get("target_role_id")
+        if target not in role_ids:
+            problems.append(
+                f"{path}.target_role_id: {target!r} not a declared role "
+                f"{sorted(role_ids)}"
+            )
+        elif not (
+            schema.is_valid_role_id(target)
+            and schema.parse_role_id(target)[0] == "heading"
+        ):
+            problems.append(
+                f"{path}.target_role_id: {target!r} is not a heading role "
+                "(a promotion may only target a declared heading.* role)"
+            )
+        key = (ref, target)
+        if key in seen:
+            problems.append(
+                f"{path}: duplicate promote_appearance entry for "
+                f"(pseudo_heading_ref={ref!r}, target_role_id={target!r})"
+            )
+        seen.add(key)
+    return problems
+
+
 # ---------------------------------------------------------------------------
 # Refinement overlay (Cluster C3) - the qualitative-answer -> comprehension delta
 # ---------------------------------------------------------------------------
@@ -1011,6 +1144,14 @@ def merge(
     # here, and ``qa.gate._apply_triage`` independently guards on severity==WARNING.
     problems.extend(check_triage(profile, trial_comp))
 
+    # 2d) Fail-closed validation of any faked-heading promotions (Cluster E2): each
+    # NAMES a SURFACED pseudo_heading ref + a DECLARED heading role, and (ref, target)
+    # is UNIQUE. Part of the SAME all-or-nothing transaction; a bad promotion rejects
+    # the whole comprehension and derives no appearance. The promoted size/color is the
+    # CAPTURED outlier value (the engine copies it, never the model); it is re-validated
+    # shell-backed by ``check_appearance_targets`` after the derive below.
+    problems.extend(check_promote_appearance(profile, trial_comp))
+
     if problems:
         # Refuse to write the understanding; record the rejection + findings.
         rejected = schema.empty_comprehension()
@@ -1040,6 +1181,14 @@ def merge(
     # alias rejected the whole comprehension before reaching here. The mint copies the
     # captured ref byte-identical; the engine never authors a color.
     _derive_palette_aliases(profile, canonical)
+    # Derive the model-adjudicated faked-heading promotions (Cluster E2) in the SAME
+    # all-or-nothing transaction: their ref-surfaced / target-heading / uniqueness were
+    # gated by ``check_promote_appearance`` above, so a bad promotion rejected the whole
+    # comprehension before reaching here. The derive COPIES each captured outlier
+    # size/color from the detector fact onto the target heading role's appearance (the
+    # engine is the sole author); ``check_appearance_targets`` then re-validates them
+    # shell-backed at QA time. No promotion ⇒ no-op (byte-identical generation).
+    _derive_promote_appearance(profile, canonical)
 
     # 4b) Derive the reusable-fragment registries from the canonical fragments.
     # comprehend OWNS components/sections: they are rebuilt deterministically from
@@ -1122,6 +1271,24 @@ def _canonicalize(
     out["triage"] = sorted(
         (dict(t) for t in triage),
         key=lambda d: (str(d.get("check")), str(d.get("location") or "")),
+    )
+
+    # promote_appearance: sorted by (pseudo_heading_ref, target_role_id) for a stable,
+    # idempotent serialization (Cluster E2). REQUIRED arm - ``empty_comprehension``
+    # rebuilds with ``promote_appearance=[]``, so omitting this copy would silently
+    # discard the model's promotions on every merge. The model wrote only the two NAMED
+    # ids (ref + target); the captured size/color is derived onto the heading role by
+    # ``_derive_promote_appearance``, never stored in the canonical entry.
+    promote = [p for p in (comp.get("promote_appearance") or []) if isinstance(p, dict)]
+    out["promote_appearance"] = sorted(
+        (
+            {
+                "pseudo_heading_ref": p.get("pseudo_heading_ref"),
+                "target_role_id": p.get("target_role_id"),
+            }
+            for p in promote
+        ),
+        key=lambda d: (str(d.get("pseudo_heading_ref")), str(d.get("target_role_id"))),
     )
 
     # demo_classification.regions: sorted by region_ref.
@@ -1281,6 +1448,61 @@ def _is_alias_entry(entry: dict) -> bool:
         and isinstance(prov[0], dict)
         and prov[0].get("where") == "palette.alias"
     )
+
+
+def _derive_promote_appearance(profile: dict, comp: dict) -> None:
+    """Derive a model-adjudicated faked-heading promotion onto the heading role (E2).
+
+    For each ``promote_appearance`` entry, looks up the SURFACED pseudo_heading fact
+    (the detector's captured outlier ``size_hp`` / ``color`` stored at extract under
+    ``theme.pseudo_headings``) by its ref and COPIES those captured values onto
+    ``roles[target_role_id].appearance`` - the SAME role-specific dict
+    ``resolver._merge_appearance`` reads (which applies a role-specific size/color to
+    ANY role WITHOUT the body-default family gate, so a promoted size/color on
+    ``heading.1`` WILL apply). The promoted values are the run's OWN captured facts;
+    the engine NEVER synthesizes a size/color, and ``check_appearance_targets``
+    re-validates them shell-backed at QA time.
+
+    Fail-closed and total: every entry was already validated by
+    :func:`check_promote_appearance` (ref surfaced, target a declared heading role,
+    pair unique) BEFORE this runs, and ``merge`` rejected the whole comprehension
+    otherwise - so this only ever derives clean promotions. A defensive re-check skips
+    an entry whose fact / role is missing or whose fact carries neither axis. The two
+    appearance axes are independent: ``size_hp`` and ``color`` are each written only
+    when the captured fact carries them (a size-only outlier writes no color). Nothing
+    is written when ``promote_appearance`` is empty, so the no-promotion path adds no
+    appearance and stays byte-identical (idempotent: a re-merge of the same proposal
+    overwrites with the same captured value)."""
+    promote = comp.get("promote_appearance")
+    if not isinstance(promote, list) or not promote:
+        return
+    roles = profile.get("roles")
+    if not isinstance(roles, dict):
+        return
+    facts = surface_pseudo_headings(profile)
+    for entry in promote:
+        if not isinstance(entry, dict):
+            continue
+        ref = entry.get("pseudo_heading_ref")
+        target = entry.get("target_role_id")
+        fact = facts.get(ref) if isinstance(ref, str) else None
+        role = roles.get(target) if isinstance(target, str) else None
+        if not isinstance(fact, dict) or not isinstance(role, dict):
+            continue
+        size_hp = fact.get("size_hp")
+        color = fact.get("color")
+        if size_hp is None and not isinstance(color, dict):
+            continue
+        appearance = role.setdefault("appearance", {})
+        if not isinstance(appearance, dict):
+            continue
+        # role-SPECIFIC size/color (wins over any captured role value; applies WITHOUT
+        # the body-default family gate). Each axis independent: write only what the
+        # captured fact carries (a size-only outlier never touches color).
+        if size_hp is not None:
+            appearance["size_hp"] = int(size_hp)
+        if isinstance(color, dict):
+            appearance["color"] = copy.deepcopy(color)
 
 
 def _derive_skeleton_attrs(profile: dict, comp: dict) -> None:

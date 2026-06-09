@@ -131,6 +131,113 @@ class CaptureTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Cluster E2: faked-heading-in-body-style detection (pure statistic, docx-first)
+# ---------------------------------------------------------------------------
+class PseudoHeadingDetectTest(unittest.TestCase):
+    """The detector surfaces a body-style size/color OUTLIER as a pseudo_heading fact
+    (a pure statistic vs the captured dominant body appearance), and a uniform body
+    surfaces nothing - so the comprehend bundle stays byte-identical."""
+
+    def _uniform_body_doc(self, *, size_pt=12.0, n=8):
+        doc = Document()
+        for _ in range(n):
+            run = doc.add_paragraph().add_run("ordinary body text")
+            run.font.size = Pt(size_pt)
+            run.font.color.theme_color = MSO_THEME_COLOR.TEXT_1
+        return doc
+
+    def test_size_outlier_is_surfaced(self):
+        # A body-style run at 22pt (44hp) when the body is 12pt (24hp) is a clear size
+        # outlier (1.83x) - surfaced with the CAPTURED size, not a synthesized one.
+        # (size_hp is round(pt*2): 12pt->24hp, 22pt->44hp.)
+        doc = self._uniform_body_doc()
+        big = doc.add_paragraph().add_run("a faked heading line")
+        big.font.size = Pt(22)
+        big.font.color.theme_color = MSO_THEME_COLOR.TEXT_1
+        theme = {"colors": {}, "fonts": {}, "text": {}}
+        typography.capture_fonts(doc, {"_index": []}, theme)
+        typography.capture_pseudo_headings(doc, {"_index": []}, theme)
+        facts = theme["pseudo_headings"]
+        self.assertEqual(len(facts), 1, facts)
+        self.assertEqual(facts[0]["size_hp"], 44)
+        self.assertNotIn("color", facts[0])  # color matches body -> not an outlier
+        # Evidence is coarse + brand-text-free (no run text leaks in).
+        self.assertIn("44hp", facts[0]["evidence"])
+        self.assertNotIn("faked heading", facts[0]["evidence"])
+
+    def test_color_outlier_is_surfaced(self):
+        # A body-style run in accent1 when the body is text1 is a color outlier.
+        doc = self._uniform_body_doc()
+        accent = doc.add_paragraph().add_run("a faked colored heading")
+        accent.font.size = Pt(12)  # same size as body -> only color is the outlier
+        accent.font.color.theme_color = MSO_THEME_COLOR.ACCENT_1
+        theme = {"colors": {}, "fonts": {}, "text": {}}
+        typography.capture_fonts(doc, {"_index": []}, theme)
+        typography.capture_pseudo_headings(doc, {"_index": []}, theme)
+        facts = theme["pseudo_headings"]
+        self.assertEqual(len(facts), 1, facts)
+        self.assertNotIn("size_hp", facts[0])  # size matches body -> not an outlier
+        self.assertEqual(facts[0]["color"], {"kind": "theme", "theme": "accent1"})
+        self.assertIn("off-body color", facts[0]["evidence"])
+
+    def test_uniform_body_surfaces_nothing(self):
+        doc = self._uniform_body_doc()
+        theme = {"colors": {}, "fonts": {}, "text": {}}
+        typography.capture_fonts(doc, {"_index": []}, theme)
+        typography.capture_pseudo_headings(doc, {"_index": []}, theme)
+        # NO key written, so the comprehend bundle stays byte-identical.
+        self.assertNotIn("pseudo_headings", theme)
+
+    def test_multiple_distinct_outliers_each_surfaced(self):
+        doc = self._uniform_body_doc()
+        for pt in (22, 28):
+            run = doc.add_paragraph().add_run("a faked heading")
+            run.font.size = Pt(pt)
+            run.font.color.theme_color = MSO_THEME_COLOR.TEXT_1
+        theme = {"colors": {}, "fonts": {}, "text": {}}
+        typography.capture_fonts(doc, {"_index": []}, theme)
+        typography.capture_pseudo_headings(doc, {"_index": []}, theme)
+        sizes = sorted(f.get("size_hp") for f in theme["pseudo_headings"])
+        self.assertEqual(sizes, [44, 56])  # 22pt->44hp, 28pt->56hp
+
+    def test_no_body_dominant_surfaces_nothing(self):
+        # A doc whose body has no captured dominant (every run a different size) has no
+        # dominant to call an outlier against - the no-capture path, byte-identical.
+        doc = Document()
+        for pt in (10, 12, 14, 16):
+            doc.add_paragraph().add_run("x").font.size = Pt(pt)
+        theme = {"colors": {}, "fonts": {}, "text": {}}
+        typography.capture_fonts(doc, {"_index": []}, theme)
+        typography.capture_pseudo_headings(doc, {"_index": []}, theme)
+        self.assertNotIn("pseudo_headings", theme)
+
+    def test_named_heading_run_is_not_a_candidate(self):
+        # A run under a REAL heading style already carries its heading role; it is not
+        # a "faked" heading and must never be surfaced as a body-style outlier.
+        doc = self._uniform_body_doc()
+        head = doc.add_paragraph(style="Heading 1").add_run("a real heading")
+        head.font.size = Pt(22)
+        theme = {"colors": {}, "fonts": {}, "text": {}}
+        typography.capture_fonts(doc, {"_index": []}, theme)
+        typography.capture_pseudo_headings(doc, {"_index": []}, theme)
+        self.assertNotIn("pseudo_headings", theme)
+
+    def test_detector_is_deterministic(self):
+        # Same template -> identical facts (stable refs, stable order).
+        def run():
+            doc = self._uniform_body_doc()
+            big = doc.add_paragraph().add_run("faked")
+            big.font.size = Pt(22)
+            big.font.color.theme_color = MSO_THEME_COLOR.TEXT_1
+            theme = {"colors": {}, "fonts": {}, "text": {}}
+            typography.capture_fonts(doc, {"_index": []}, theme)
+            typography.capture_pseudo_headings(doc, {"_index": []}, theme)
+            return theme["pseudo_headings"]
+
+        self.assertEqual(run(), run())
+
+
+# ---------------------------------------------------------------------------
 # resolver: role-specific font wins; body font is the fallback (incl. stub)
 # ---------------------------------------------------------------------------
 class ResolverAppearanceTest(unittest.TestCase):
@@ -338,6 +445,53 @@ class AppearanceTargetsCheckTest(unittest.TestCase):
             self.assertEqual(
                 checks_deterministic.check_appearance_targets(shell, prof), []
             )
+
+
+class PromotedAppearanceShellBackedTest(unittest.TestCase):
+    """E2: a promoted size/color on a heading role is re-validated SHELL-BACKED by the
+    EXISTING ``check_appearance_targets`` (it walks ``roles[*].appearance``), so a
+    promoted value the shell does not carry is an ERROR - the model can never inject a
+    value the template lacks."""
+
+    def _profile_with_promoted_size(self, size_hp):
+        # A heading role carrying a role-SPECIFIC promoted size (as _derive_promote_
+        # appearance would write it). Arial keeps the font axis shell-backed so only the
+        # promoted size is under test.
+        return _profile(
+            theme={"colors": {}, "fonts": {"body": {"latin": "Arial"}}},
+            roles={
+                "_index": ["heading.1"],
+                "heading.1": {
+                    "resolver": {"type": "named_style", "style_id": "Heading1"},
+                    "appearance": {"size_hp": size_hp},
+                },
+            },
+        )
+
+    def test_promoted_size_present_in_shell_passes(self):
+        with tempfile.TemporaryDirectory() as td:
+            # The shell carries a 22pt (44hp) run, so a promoted 44hp is shell-backed.
+            shell = _shell(Path(td), size_hp=44)
+            prof = self._profile_with_promoted_size(44)
+            errs = [
+                f
+                for f in checks_deterministic.check_appearance_targets(shell, prof)
+                if f.severity == schema.Severity.ERROR.value
+            ]
+            self.assertEqual(errs, [])
+
+    def test_promoted_size_absent_from_shell_is_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            # The shell carries only a 44hp run; a promoted 99hp is NOT shell-backed.
+            shell = _shell(Path(td), size_hp=44)
+            prof = self._profile_with_promoted_size(99)
+            errs = [
+                f
+                for f in checks_deterministic.check_appearance_targets(shell, prof)
+                if f.severity == schema.Severity.ERROR.value
+            ]
+            self.assertTrue(errs)
+            self.assertTrue(any("99" in f.message for f in errs), errs)
 
 
 # ---------------------------------------------------------------------------

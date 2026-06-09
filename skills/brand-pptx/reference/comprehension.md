@@ -286,6 +286,41 @@ severity** - the eligible checks are WARNING-only and the demotion only ever low
 a WARNING to INFO, so a real failure can never be silenced. An empty `triage` list
 is the norm.
 
+## Promoting a faked heading onto a real heading role (the `promote_appearance` list)
+
+Some templates **fake** a heading: a line that LOOKS like a heading - visibly larger
+and/or in a brand color - is authored with the **body** paragraph style (no heading
+role, no named heading style), so the deterministic engine treats it as body and the
+brand heading look is lost. The extractor's pure-deterministic detector surfaces each
+such body-style run as a `pseudo_heading` fact in the bundle when its captured size or
+color is a clear **outlier** vs the dominant body appearance. Each fact carries a
+stable structural `ref`, the run's OWN captured outlier `size_hp` (half-points) and/or
+`color`, and coarse, brand-text-free `evidence` (e.g. `"size 44hp vs dominant body
+24hp"`). The list is absent when the detector found no outlier.
+
+When you judge that a candidate is a real heading the template faked, you MAY persist a
+`promote_appearance` list, merged via `comprehend`:
+
+```jsonc
+"promote_appearance": [
+  {
+    "pseudo_heading_ref": "body_run_3",     // a verbatim ref from facts.pseudo_headings
+    "target_role_id": "heading.1"           // a declared heading.* role to promote onto
+  }
+]
+```
+
+You **name** only the two ids; you **never** author a size or color. On a clean merge
+the engine COPIES the captured outlier `size_hp`/`color` from the detector fact onto
+`roles[target_role_id].appearance`, so the generated heading carries the size/color the
+template proved it uses. The `pseudo_heading_ref` MUST be a ref the detector surfaced
+(an empty/absent `pseudo_headings` inventory fails closed), `target_role_id` MUST be a
+declared `heading.*` role (a non-heading target is rejected), and a `(ref, target)` pair
+must be unique. The promoted size/color is re-validated **shell-backed** at QA exactly
+like any applied appearance: a value the shell does not carry is an ERROR, so the engine
+can never inject a size/color the template lacks. An empty `promote_appearance` list is
+the norm.
+
 ## Refining the understanding from user feedback (the `refine` verb)
 
 After a generation, the user may give qualitative feedback - in **text** or as a

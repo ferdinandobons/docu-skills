@@ -6,6 +6,51 @@ All notable changes to BrandDocs are documented in this file.
 
 ### Added
 
+- **Faked-heading-in-body-style detection (DOCX-first, Cluster E2).** Some templates FAKE a
+  heading: a line that LOOKS like a heading (visibly larger and/or in a brand color) is authored
+  with the BODY paragraph style - no heading role, no named heading style - so the deterministic
+  engine treats it as body and the brand heading look is lost. E2 closes this in three
+  deterministic-plus-model steps, reusing the existing resolver/appearance seam, with NO new
+  appearance check and NO schema bump (additive within 1.2.0).
+  - **Detect (pure-deterministic):** a new `common.typography.detect_pseudo_headings` is a PURE
+    STATISTIC vs the captured DOMINANT body appearance - a body-style run whose EXPLICIT
+    `size_hp` is a clear OUTLIER (>=1.5x or <=0.67x the dominant body size) OR whose EXPLICIT
+    color is OFF-BODY (a different bucket than the dominant body color) is a candidate fake
+    heading. Nothing is hardcoded to any template (the ratio/equality test is against the
+    template's OWN observed dominant). The docx extractor's `capture_pseudo_headings` runs after
+    `capture_fonts` and stores each candidate additively under `theme.pseudo_headings` as
+    `{ref, size_hp?, color?, evidence}` - a stable structural ref, the run's OWN captured outlier
+    size/color (a FACT about the template, never synthesized), and coarse, brand-text-free
+    evidence. A uniform body leaves the key ABSENT (no-op).
+  - **Surface:** `comprehend_input_bundle` adds `facts.pseudo_headings` ONLY when the detector
+    found candidates (the B4 `generation_history` pattern), so the no-candidate bundle is
+    byte-identical. The facts are READ-ONLY; they never change generation on their own.
+  - **Adjudicate (model NAMES only):** a new closed `comprehension.promote_appearance` sink (a
+    peer of `triage`) - a list of `{pseudo_heading_ref, target_role_id}`. The model NAMES a
+    surfaced ref + a declared heading role; it authors NO size/color. Shape is validated by
+    `schema._validate_comp_promote_appearance` (which also REJECTS a model-authored
+    `size_hp`/`color`); membership is validated fail-closed by a new
+    `comprehension.check_promote_appearance` (ref must be a surfaced `pseudo_heading`, target
+    must be a DECLARED `heading.*` role, `(ref, target)` unique), wired into `merge()` in the
+    SAME all-or-nothing transaction as `check_triage`. An empty/absent palette of candidates
+    fails closed (like every other load-bearing ref).
+  - **Dispose (engine AUTHORS the value):** on a clean merge, a new
+    `comprehension._derive_promote_appearance` COPIES the captured outlier `size_hp`/`color`
+    from the detector fact onto `roles[target_role_id].appearance` - the SAME role-specific dict
+    `resolver._merge_appearance` reads (a role-specific size/color applies to ANY role WITHOUT
+    the body-default family gate, so a promoted value on `heading.1` WILL apply). The two axes
+    are independent (a size-only outlier writes no color).
+  - **Verify (existing check, no new one):** because the promoted size/color now live in
+    `roles[*].appearance`, the EXISTING `check_appearance_targets` re-validates them
+    SHELL-BACKED at QA time - a promoted size the shell carries on no run, or a promoted color
+    absent from the palette/runs, is an ERROR. The engine never injects a value the template
+    does not contain.
+  - **Universal + additive:** schema stays at 1.2.0 (`promote_appearance` is a new closed sink
+    and `theme.pseudo_headings` is additive). A profile that adjudicates no promotion leaves the
+    heading appearance unchanged, so generation stays byte-identical (the frozen anchor stays
+    green). pptx/xlsx carry no body-style runs, so they surface no candidates and stay
+    byte-identical. The model bundle's `reference/comprehension.md` (all three byte-identical
+    copies) documents the `promote_appearance` adjudication.
 - **Off-theme accent reachability via palette aliases (all three formats, Cluster E1).** An
   off-theme brand accent the template uses in content is captured as a `hex:RRGGBB`
   `theme.palette` entry, which is harder to ADDRESS as a named run color than a clrScheme

@@ -1141,6 +1141,16 @@ def empty_comprehension() -> dict:
         # norm. (Omitting this key would silently drop triage in ``_canonicalize``,
         # which rebuilds from this empty block.)
         "triage": [],
+        # Additive (Cluster E2): the model-adjudicated faked-heading promotions. Each
+        # entry is { pseudo_heading_ref, target_role_id } naming a SURFACED
+        # ``pseudo_heading`` fact (a body-style size/color outlier the detector found)
+        # and a DECLARED heading role. The model authors no size/color: on a clean
+        # merge ``_derive_promote_appearance`` COPIES the captured outlier size/color
+        # from the detector fact onto ``roles[target_role_id].appearance`` (re-validated
+        # shell-backed by ``check_appearance_targets``). Empty is the norm. (Omitting
+        # this key would silently drop the promotions in ``_canonicalize``, which
+        # rebuilds from this empty block.)
+        "promote_appearance": [],
     }
 
 
@@ -1323,6 +1333,12 @@ def _validate_comprehension(comp: Any) -> list[str]:
     # QA-triage list (Cluster C2). SHAPE-ONLY; that the (check, location) was actually
     # emitted is the fail-closed ``check_triage_targets`` / ``check_triage`` job.
     problems.extend(_validate_comp_triage(comp.get("triage")))
+
+    # promote_appearance: [ { pseudo_heading_ref, target_role_id } ] - the faked-heading
+    # promotion list (Cluster E2). SHAPE-ONLY; that the ref was SURFACED by the detector
+    # and the target is a DECLARED heading role is the fail-closed ``check_promote_appearance``
+    # job (same split as triage refs vs ``check_triage``).
+    problems.extend(_validate_comp_promote_appearance(comp.get("promote_appearance")))
     return problems
 
 
@@ -1622,6 +1638,51 @@ def _validate_comp_triage(triage: Any) -> list[str]:
             problems.append(
                 f"{path}.evidence: must be a string or null, got {evidence!r}"
             )
+    return problems
+
+
+def _validate_comp_promote_appearance(promote: Any) -> list[str]:
+    """Validate ``comprehension.promote_appearance`` (the faked-heading promotion list,
+    Cluster E2).
+
+    SHAPE-ONLY, mirroring :func:`_validate_comp_triage` and never-required: a profile
+    without the key, or with ``promote_appearance == []``, yields no problems. Each
+    entry must be an object carrying a non-empty string ``pseudo_heading_ref`` (a ref
+    the detector surfaced) and a non-empty string ``target_role_id`` (a declared
+    heading role). The model authors NO size/color here - only NAMES a surfaced ref +
+    a target role - so an entry carrying a ``size_hp`` / ``color`` is rejected (the
+    engine is the sole author of the promoted value, copied from the captured fact).
+
+    It deliberately does NOT check that the ``pseudo_heading_ref`` was actually
+    SURFACED by the detector, nor that ``target_role_id`` is a declared heading role,
+    nor that the ``(ref, target)`` pair is unique - those are the fail-closed
+    ``check_promote_appearance`` job (same split as triage refs vs ``check_triage``).
+    """
+    if promote is None:
+        return []
+    if not isinstance(promote, list):
+        return ["comprehension.promote_appearance: must be a list"]
+    problems: list[str] = []
+    for i, entry in enumerate(promote):
+        path = f"comprehension.promote_appearance[{i}]"
+        if not isinstance(entry, dict):
+            problems.append(f"{path}: must be an object")
+            continue
+        ref = entry.get("pseudo_heading_ref")
+        if not isinstance(ref, str) or not ref:
+            problems.append(f"{path}.pseudo_heading_ref: required non-empty string")
+        target = entry.get("target_role_id")
+        if not isinstance(target, str) or not target:
+            problems.append(f"{path}.target_role_id: required non-empty string")
+        # The model NAMES only; it never authors the promoted appearance. A size/color
+        # in the entry would let the model inject a value the template may not carry,
+        # so reject it here (the engine copies the captured fact, the sole author).
+        for authored in ("size_hp", "color"):
+            if entry.get(authored) is not None:
+                problems.append(
+                    f"{path}.{authored}: must not be authored by the model "
+                    "(the engine copies the captured pseudo_heading value)"
+                )
     return problems
 
 

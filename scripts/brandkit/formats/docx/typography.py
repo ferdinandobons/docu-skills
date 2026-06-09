@@ -54,6 +54,9 @@ from brandkit.common.typography import (
     capture_appearance as _capture_appearance,
 )
 from brandkit.common.typography import (
+    detect_pseudo_headings as _detect_pseudo_headings,
+)
+from brandkit.common.typography import (
     capture_palette_facts as _capture_palette_facts,
 )
 from brandkit.common.typography import (
@@ -78,6 +81,7 @@ __all__ = [
     "capture_palette",
     "capture_geometry",
     "capture_table_appearance",
+    "capture_pseudo_headings",
     "PALETTE_WHERE",
 ]
 
@@ -209,6 +213,69 @@ def capture_fonts(doc, roles: dict, theme: dict) -> None:
     ``role_style_key`` reproduces the docx ``named_style`` OR-match byte-identically.
     """
     _capture_appearance(_font_run_facts(doc), roles, theme)
+
+
+# ---------------------------------------------------------------------------
+# Faked-heading-in-body-style detection (Cluster E2, DOCX-FIRST).
+# ---------------------------------------------------------------------------
+def _dominant_body_style_key(doc) -> Optional[tuple[Optional[str], Optional[str]]]:
+    """The dominant paragraph style key across the document's body runs, or ``None``.
+
+    The body/Normal style is the one the MOST body runs carry: a faked heading lives
+    in a paragraph using THIS style (not a named heading style). We pick it as the
+    most common style key over the same direct-run pass ``capture_fonts`` samples, so
+    the pseudo-heading detector compares runs the engine truly treats as body. A
+    document with no styled body run yields ``None`` (the detector then keys only on
+    runs with no style of their own)."""
+    counter: Counter = Counter()
+    for fact in _font_run_facts(doc):
+        if not (fact.text or "").strip():
+            continue
+        key = fact.style_key
+        if key is not None and (key[0] or key[1]):
+            counter[key] += 1
+    if not counter:
+        return None
+    return counter.most_common(1)[0][0]
+
+
+def capture_pseudo_headings(doc, roles: dict, theme: dict) -> None:
+    """Detect faked-heading-in-body-style candidates and store them additively under
+    ``theme['pseudo_headings']`` (mutated in place), for the model to adjudicate via
+    the ``comprehension.promote_appearance`` sink. DOCX-FIRST (Cluster E2).
+
+    Runs AFTER :func:`capture_fonts` so the dominant body appearance
+    (``theme.fonts.body.size_hp`` / ``theme.text.body.color``) is already captured;
+    the detector compares each body-style run's OWN explicit size/color against that
+    dominant (a PURE STATISTIC, nothing hardcoded to a template). Each candidate is
+    stored as ``{ref, size_hp?, color?, evidence}`` - the run's CAPTURED outlier
+    values plus a coarse, brand-text-free evidence string.
+
+    Additive and deterministic: a template with no body-style size/color outlier (a
+    uniform body) leaves ``theme['pseudo_headings']`` ABSENT, so the comprehend bundle
+    stays byte-identical and generation is unchanged. The facts are READ-ONLY in the
+    bundle - they never change generation on their own; only a model-adjudicated
+    ``promote_appearance`` (re-validated shell-backed) moves any appearance.
+
+    NOT wired into pptx/xlsx: a faked heading is a WordprocessingML body-paragraph
+    phenomenon; pptx/xlsx carry no body-style runs, so they surface no candidates and
+    stay byte-identical.
+    """
+    body_style_key = _dominant_body_style_key(doc)
+    facts = _detect_pseudo_headings(
+        _font_run_facts(doc), theme, body_style_key=body_style_key
+    )
+    if not facts:
+        return
+    theme["pseudo_headings"] = [
+        {
+            "ref": f.ref,
+            **({"size_hp": f.size_hp} if f.size_hp is not None else {}),
+            **({"color": f.color} if f.color is not None else {}),
+            "evidence": f.evidence,
+        }
+        for f in facts
+    ]
 
 
 # ---------------------------------------------------------------------------

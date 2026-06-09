@@ -31,7 +31,15 @@ left ``null`` here - ``comprehend`` is the only writer that fills them.
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Callable, Iterable, Optional, Protocol, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    NamedTuple,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 from brandkit.common import color as colorutil
 
@@ -297,6 +305,189 @@ def capture_appearance(
         if dom_color is not None:
             appearance["color"] = _color_obj(dom_color[0])
             appearance["color_confidence"] = round(dom_color[1], 3)
+
+
+# ---------------------------------------------------------------------------
+# Faked-heading-in-body-style detection (Cluster E2).
+# ---------------------------------------------------------------------------
+# Some templates FAKE a heading: a line that LOOKS like a heading (visibly larger
+# and/or in a brand color) is authored with the BODY paragraph style - no heading
+# role, no named heading style - so the deterministic engine treats it as body and
+# the brand heading look is lost. E2 SURFACES each such body-style run as a
+# ``pseudo_heading`` FACT the model adjudicates: it carries a stable structural ref,
+# the run's OWN captured outlier size/color (a FACT about the template, not a brand
+# value the engine synthesizes), and coarse, brand-text-free evidence.
+#
+# The detector is a PURE STATISTIC vs the captured DOMINANT body appearance (the
+# SAME ``_dominant`` winners ``capture_appearance`` records into ``theme.fonts.body``
+# / ``theme.text.body``): a body-style run is a candidate when its EXPLICIT size is a
+# clear OUTLIER (markedly larger or smaller than the body size) OR its EXPLICIT color
+# is OFF-BODY (a different bucket than the dominant body color). Nothing is hardcoded
+# to any template's points/hex - the comparison is against the template's OWN observed
+# dominant, so the test is universal. The detector only SURFACES candidates; it never
+# changes generated output by itself (the model must adjudicate a promotion before any
+# appearance moves, and the promoted value is re-validated shell-backed at QA).
+
+# The size-outlier ratio bounds: a body-style run is a size outlier when its explicit
+# size is at least 1.5x the dominant body size (a markedly larger fake heading) or at
+# most 0.67x it (a markedly smaller one). These are FIXED, template-INVARIANT ratios
+# applied to the template's OWN dominant body size (never an absolute point bound), so
+# the test stays universal - a 12pt body flags a >=18pt run, a 16pt body flags a
+# >=24pt run, each relative to its own template.
+_PSEUDO_HEADING_SIZE_RATIO_HI = 1.5
+_PSEUDO_HEADING_SIZE_RATIO_LO = 0.67
+
+
+class PseudoHeadingFact(NamedTuple):
+    """One detected faked-heading-in-body-style candidate (Cluster E2).
+
+    Emitted by the pure-deterministic outlier detector
+    (:func:`detect_pseudo_headings`) and surfaced as a ``pseudo_heading`` fact in the
+    ``comprehend_input_bundle``. The model adjudicates a promotion by NAMING the
+    ``ref`` + a declared heading role; the engine then copies the CAPTURED
+    ``size_hp`` / ``color`` onto that role (never a synthesized value).
+
+      - ``ref`` is a stable STRUCTURAL id from the run enumeration the detector walks
+        (``body_run_{n}`` over the body-style runs in document order); it is an
+        internal id, NOT a surfaced inventory ref like an anchor/field/region.
+      - ``size_hp`` / ``color`` are the run's OWN explicit captured outlier values (a
+        half-point int / a stored color object), each ``None`` when that axis is not
+        the outlier (the axes are independent).
+      - ``evidence`` is coarse, brand-text-free (e.g. ``"size 4400hp vs dominant body
+        2400hp"`` / ``"off-body color theme:accent1 vs body theme:text1"``).
+    """
+
+    ref: str
+    size_hp: Optional[int]
+    color: Optional[dict]
+    evidence: str
+
+
+def _is_size_outlier(size_hp: Optional[int], body_size_hp: Optional[int]) -> bool:
+    """True when ``size_hp`` is a clear size outlier vs the dominant ``body_size_hp``.
+
+    Pure ratio test against the template's OWN dominant body size (no absolute point
+    bound): an explicit run size at least :data:`_PSEUDO_HEADING_SIZE_RATIO_HI` x the
+    body size (a markedly larger fake heading) or at most
+    :data:`_PSEUDO_HEADING_SIZE_RATIO_LO` x it. ``None`` on either side (an inherited
+    run size, or a template with no captured body size) is never an outlier.
+    """
+    if not size_hp or not body_size_hp:
+        return False
+    ratio = size_hp / body_size_hp
+    return (
+        ratio >= _PSEUDO_HEADING_SIZE_RATIO_HI or ratio <= _PSEUDO_HEADING_SIZE_RATIO_LO
+    )
+
+
+def _is_color_outlier(
+    color: Optional[tuple[str, ...]], body_bucket: Optional[tuple[str, ...]]
+) -> bool:
+    """True when the run's explicit ``color`` bucket is OFF the dominant body color.
+
+    A pure equality test against the template's OWN dominant body color bucket: an
+    EXPLICIT run color that differs from the body bucket (a different theme token, or
+    an off-theme hex where the body is a theme color, or vice versa) is off-body.
+    ``None`` on either side (an inherited run color, or a template with no captured
+    body color) is never an outlier - the run simply carries the body color.
+    """
+    if color is None or body_bucket is None:
+        return False
+    return color != body_bucket
+
+
+def detect_pseudo_headings(
+    run_facts: Iterable[RunFacts],
+    theme: dict,
+    *,
+    body_style_key: Optional[tuple[Optional[str], Optional[str]]] = None,
+) -> list[PseudoHeadingFact]:
+    """Detect faked-heading-in-body-style candidates (Cluster E2), pure-deterministic.
+
+    Reads the ALREADY-CAPTURED per-run facts (``size_hp`` half-points / ``color``
+    bucket) the SAME ``run_facts`` :func:`capture_appearance` consumed, and compares
+    each BODY-STYLE run against the captured DOMINANT body appearance (the
+    ``theme.fonts.body.size_hp`` / ``theme.text.body.color`` winners). A body-style
+    run whose EXPLICIT size is a clear outlier (:func:`_is_size_outlier`) OR whose
+    EXPLICIT color is off-body (:func:`_is_color_outlier`) is surfaced as a
+    :class:`PseudoHeadingFact`. The size/color carried on the fact are the run's OWN
+    captured outlier values (facts about the template, never synthesized).
+
+    A run is "body-style" when it has NO style key of its own (``style_key`` is
+    ``None`` / empty) - it votes only toward the document body - OR when its style
+    key matches ``body_style_key`` (the explicit body/Normal style). This keeps the
+    detector to runs the engine actually treats as body (a run under a named heading
+    style already carries its heading role and is never a "faked" heading).
+
+    Returns ``[]`` when nothing is an outlier (a uniform body, or a template with no
+    captured body dominant to compare against) - the caller then writes NO
+    ``pseudo_headings`` key, so the bundle stays byte-identical. Order-preserving and
+    deterministic (one ordered pass over ``run_facts``); the ``ref`` enumerates the
+    body-style runs in document order so it is stable across re-extractions.
+    """
+    body_size_hp = ((theme.get("fonts") or {}).get("body") or {}).get("size_hp")
+    body_color_obj = ((theme.get("text") or {}).get("body") or {}).get("color")
+    body_bucket = (
+        _color_obj_to_bucket(body_color_obj)
+        if isinstance(body_color_obj, dict)
+        else None
+    )
+    # Nothing to compare against: a template with no captured body size AND no body
+    # color has no dominant to call an outlier (the no-capture path).
+    if not body_size_hp and body_bucket is None:
+        return []
+
+    facts: list[PseudoHeadingFact] = []
+    index = 0
+    for fact in run_facts:
+        if not (fact.text or "").strip():
+            continue
+        key = fact.style_key
+        is_body = key is None or not (key[0] or key[1]) or key == body_style_key
+        if not is_body:
+            continue
+        ref = f"body_run_{index}"
+        index += 1
+        size_outlier = _is_size_outlier(fact.size_hp, body_size_hp)
+        color_outlier = _is_color_outlier(fact.color, body_bucket)
+        if not size_outlier and not color_outlier:
+            continue
+        size_hp = int(fact.size_hp) if size_outlier else None
+        color = _color_obj(fact.color) if color_outlier and fact.color else None
+        facts.append(
+            PseudoHeadingFact(
+                ref=ref,
+                size_hp=size_hp,
+                color=color,
+                evidence=_pseudo_heading_evidence(
+                    size_hp, color, body_size_hp, body_bucket
+                ),
+            )
+        )
+    return facts
+
+
+def _pseudo_heading_evidence(
+    size_hp: Optional[int],
+    color: Optional[dict],
+    body_size_hp: Optional[int],
+    body_bucket: Optional[tuple[str, ...]],
+) -> str:
+    """A coarse, brand-text-free evidence string for a detected pseudo-heading.
+
+    Names only the captured NUMERIC size (half-points) and the structural COLOR
+    bucket (``theme:<token>`` / ``hex:RRGGBB``) vs the dominant body - never any
+    template/brand TEXT. The two halves are joined when both axes are outliers.
+    """
+    parts: list[str] = []
+    if size_hp is not None and body_size_hp:
+        parts.append(f"size {size_hp}hp vs dominant body {int(body_size_hp)}hp")
+    if color is not None:
+        run_key = _color_obj_to_bucket(color)
+        run_label = _palette_key(run_key) if run_key is not None else "?"
+        body_label = _palette_key(body_bucket) if body_bucket is not None else "?"
+        parts.append(f"off-body color {run_label} vs body {body_label}")
+    return "; ".join(parts)
 
 
 # ---------------------------------------------------------------------------
