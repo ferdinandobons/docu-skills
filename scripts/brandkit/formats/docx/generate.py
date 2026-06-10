@@ -14,6 +14,7 @@ from docx.opc.part import Part
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import qn
 from docx.shared import Emu, Pt, RGBColor
+from lxml import etree
 
 from brandkit.common import appearance
 from brandkit.common import color as colorutil
@@ -1149,16 +1150,18 @@ def _reassert_level_facts(lvl, facts: dict) -> None:
     shell (never synthesized): ``w:numFmt@w:val`` / ``w:lvlText@w:val`` are set on the
     existing or a freshly-created child (created at its SPEC-CORRECT ``CT_Lvl``
     position via :func:`_insert_lvl_child_ordered`); each ``w:ind`` attribute is set
-    on the level's ``w:pPr/w:ind`` set-only-when-unset."""
+    on the level's ``w:pPr/w:ind`` set-only-when-unset. An explicitly EMPTY attribute
+    (``w:val=""``, not valid OOXML) counts as unset, so a malformed template cannot
+    pin a captured fact behind an empty string."""
     numfmt = facts.get("numFmt")
     if numfmt is not None:
         el = _insert_lvl_child_ordered(lvl, "w:numFmt")
-        if el.get(qn("w:val")) is None:
+        if el.get(qn("w:val")) in (None, ""):
             el.set(qn("w:val"), str(numfmt))
     lvltext = facts.get("lvlText")
     if lvltext is not None:
         el = _insert_lvl_child_ordered(lvl, "w:lvlText")
-        if el.get(qn("w:val")) is None:
+        if el.get(qn("w:val")) in (None, ""):
             el.set(qn("w:val"), str(lvltext))
     indent = facts.get("indent") or {}
     if indent:
@@ -1171,7 +1174,7 @@ def _reassert_level_facts(lvl, facts: dict) -> None:
             value = indent.get(attr)
             if value is None:
                 continue
-            if ind.get(qn(f"w:{attr}")) is not None:
+            if ind.get(qn(f"w:{attr}")) not in (None, ""):
                 continue  # authored indent is never clobbered (set-only-when-unset)
             try:
                 ind.set(qn(f"w:{attr}"), str(int(value)))
@@ -1613,8 +1616,10 @@ def _set_twips_if_unset(el, attr: str, value) -> None:
 
     The set-only-when-unset guard at the single-attribute level, so an authored
     spacing/indent attribute is never clobbered. A non-int ``value`` is skipped (the
-    captured value is always an int twips; this is a defensive guard)."""
-    if value is None or el.get(qn(f"w:{attr}")) is not None:
+    captured value is always an int twips; this is a defensive guard). An explicitly
+    EMPTY attribute value (``w:val=""``, not valid OOXML but reachable from an
+    adversarial template) counts as unset, so the captured value still applies."""
+    if value is None or el.get(qn(f"w:{attr}")) not in (None, ""):
         return
     try:
         el.set(qn(f"w:{attr}"), str(int(value)))
@@ -1655,7 +1660,10 @@ def _apply_borders(ppr, borders: dict) -> None:
     set-only-when-unset. ``w:pBdr`` is created at its spec position; each side element
     is RE-PARSED from its serialized copy and appended verbatim (the exact structure
     capture recorded), only when the side is absent. A malformed serialized side is
-    skipped (never crashes the write)."""
+    skipped (never crashes the write): only the two parse failures a profile string
+    can cause (``XMLSyntaxError``, a declaration ``ValueError``) are swallowed, and a
+    parsed element whose qualified tag is not the expected ``w:<side>`` is refused so
+    a mislabeled capture can never land under ``w:pBdr`` as the wrong side."""
     if not borders:
         return
     pbdr = _insert_ppr_child_ordered(ppr, "w:pBdr")
@@ -1665,7 +1673,9 @@ def _apply_borders(ppr, borders: dict) -> None:
             continue
         try:
             el = parse_xml(serialized)
-        except Exception:
+        except (etree.XMLSyntaxError, ValueError):
+            continue
+        if el.tag != qn(f"w:{side}"):
             continue
         pbdr.append(el)
 

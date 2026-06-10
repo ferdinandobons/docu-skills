@@ -1377,7 +1377,15 @@ def refresh_visible_caption_index_cache(doc, entries_by_seq: dict) -> int:
             continue
         children = list(body)
         begin_i, end_i = f["begin_index"], f["end_index"]
-        if end_i >= len(children):
+        # Both bounds are validated BEFORE any children[...] access: a corrupted
+        # field inventory (or a body mutated between inventory and splice) must
+        # skip the index, never raise IndexError mid-rebuild.
+        if (
+            begin_i < 0
+            or begin_i >= len(children)
+            or end_i < 0
+            or end_i >= len(children)
+        ):
             continue
         template_p = children[begin_i]
         instr = f" {f['instr'].strip()} "  # restore the field-code surrounding spaces
@@ -1386,7 +1394,7 @@ def refresh_visible_caption_index_cache(doc, entries_by_seq: dict) -> int:
         new_paras.append(_toc_field_end_paragraph(template_p))
         for np in new_paras:
             template_p.addprevious(np)
-        for k in range(begin_i, end_i + 1):
+        for k in range(begin_i, min(end_i + 1, len(children))):
             old = children[k]
             if not _is_sectpr(old) and old.getparent() is body:
                 body.remove(old)

@@ -358,6 +358,17 @@ unresolved/`None` as **inherited - OK**. `ERROR` is reserved for a literal sRGB 
 resolver itself wrote; in `verify_foreign` it downgrades to `WARNING` unless the palette
 is declared closed.
 
+### Check ids (frozen registry)
+Every check id the deterministic L0 library may stamp on a `Finding` is listed in the
+frozen `CHECK_REGISTRY` in `qa/model.py`, and `tests/test_check_registry.py` fails on
+any unregistered id. Check ids are a **persisted contract**: they key
+`generation_report.json` digests, the cross-run regression multiset, and the `learn`
+distillation, so an existing id is never renamed in place (a rename would orphan every
+saved profile's history). New ids follow `{entity}_{predicate}` in lowercase snake_case
+(e.g. `resolver_targets_exist`, `override_targets_exist`); the pre-registry ids that
+deviate from the pattern (e.g. `appearance_table_targets`, `schema`) are grandfathered,
+not a template to copy.
+
 ---
 
 ## 10. Units

@@ -3,3 +3,7 @@ Copyright (c) 2026 Ferdinando Bonsegna
 
 This M1 implementation is original MIT-licensed code. It does not vendor
 proprietary Office helper scripts and does not include customer template assets.
+
+This implementation uses python-docx, python-pptx, openpyxl, and lxml for
+OOXML manipulation; Pillow for image processing. The OOXML resolver, profile
+schema, QA gate, and CLI are custom-implemented from scratch.

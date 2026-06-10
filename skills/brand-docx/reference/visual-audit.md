@@ -58,7 +58,7 @@ Notes:
 
 The proxies are deterministic (aggregate luma/ink fractions, no randomness, no
 single-pixel font-hinting sensitivity) and conservative (tuned to render data:
-content pages mean-luma ~240–252, a blank page ~255) to minimize false positives.
+content pages mean-luma ~240-252, a blank page ~255) to minimize false positives.
 They accept either a PIL image or a PNG path and never raise on an unreadable
 image (they return no findings instead).
 

@@ -91,6 +91,11 @@ Use its output to decide the run mode:
 8. **Feedback** (only after returning the file): invite a refinement of the
    understanding for future documents (see below).
 
+Before generation, inspect `profile.json.artifact_catalog` when the user asks
+to mimic a specific template piece. It records OOXML parts, media parts,
+paragraph/table styles, style details, sections/margins, paragraph samples,
+and table counts.
+
 ## Feedback (end of generation)
 
 Ask for feedback **only after** you have returned the generated `.docx` and its
@@ -128,7 +133,7 @@ python scripts/cli.py extract --name <brand> --template <template.docx> --scope 
 ## Internal Comprehend (optional, model-driven)
 
 Read [reference/comprehension.md](reference/comprehension.md) for the full
-guidance, the five questions, and the anti-overfitting directive. In short:
+guidance, the six questions, and the anti-overfitting directive. In short:
 
 ```bash
 python scripts/cli.py comprehend-input --name <brand>   # prints {facts, excerpt} for the model
@@ -139,6 +144,12 @@ Skip this verb when `comprehension.status` is `present` **and** its
 `source_shell_sha256` equals the live `provenance.shell.sha256` (a current
 comprehension is already cached). A re-extract resets it to `absent`; re-run
 `comprehend` only then. Never re-run it at generate time.
+
+> **docx readiness.** The Word extractor surfaces cover anchors, TOC/list
+> fields when present, and text regions. A current comprehension can therefore
+> steer cover fill, index regeneration, and demo-region clearing. If a document
+> genuinely has no TOC/list field, do not force one; a ref into an empty field
+> inventory is fail-closed and will be rejected.
 
 ## Internal Verify
 

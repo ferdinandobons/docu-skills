@@ -131,7 +131,7 @@ python scripts/cli.py extract --name <brand> --template <template.xlsx> --scope 
 ## Internal Comprehend (optional, model-driven)
 
 Read [reference/comprehension.md](reference/comprehension.md) for the full
-guidance, the five questions, and the anti-overfitting directive. In short:
+guidance, the six questions, and the anti-overfitting directive. In short:
 
 ```bash
 python scripts/cli.py comprehend-input --name <brand>   # prints {facts, excerpt} for the model

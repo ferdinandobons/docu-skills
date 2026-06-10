@@ -412,9 +412,17 @@ def role_id(family: str, *qualifiers: Any) -> str:
     ``role_id("heading", 1)`` -> ``"heading.1"``;
     ``role_id("list", "bullet", 2)`` -> ``"list.bullet.2"``;
     ``role_id("paragraph")`` -> ``"paragraph"``.
+
+    The composed id is validated against :data:`_ROLE_ID_RE` before returning, so
+    this helper can never emit an id :func:`is_valid_role_id` would reject (an
+    empty family, uppercase characters, or special characters in a qualifier
+    raise ``ValueError`` at the composition point instead of silently failing a
+    later role lookup).
     """
     parts = [str(family)] + [str(q) for q in qualifiers if q is not None and q != ""]
     rid = ".".join(parts)
+    if not is_valid_role_id(rid):
+        raise ValueError(f"composed role_id {rid!r} is not valid")
     return rid
 
 
