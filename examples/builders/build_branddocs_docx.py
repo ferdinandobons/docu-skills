@@ -250,6 +250,19 @@ def _table_cellmar(table, *, side_twips=115):
         tblPr.append(mar)
 
 
+def _table_repeat_header(table) -> None:
+    """BP-TBL-HEADER: mark the first row as a REPEATING header (``w:trPr/w:tblHeader``)
+    so a branded table that breaks across pages re-shows its navy header row instead
+    of leaving orphan data rows headerless (seen on the revenue table page break)."""
+    tr = table.rows[0]._tr
+    trPr = tr.find(_w("trPr"))
+    if trPr is None:
+        trPr = _el("trPr")
+        tr.insert(0, trPr)
+    if trPr.find(_w("tblHeader")) is None:
+        _sub(trPr, "tblHeader")
+
+
 def _stamp_body_geometry(doc) -> None:
     """DOCX-D1: stamp the brand's DIRECT paragraph-spacing convention on the body.
 
@@ -1122,17 +1135,16 @@ def _cover_background_shape():
     extb.set("cx", "5943600")
     extb.set("cy", "274320")
     geom = etree.SubElement(sppr, f"{{{A}}}prstGeom")
-    geom.set("prst", "roundRect")
-    av = etree.SubElement(geom, f"{{{A}}}avLst")
-    gd = etree.SubElement(av, f"{{{A}}}gd")
-    gd.set("name", "adj")
-    gd.set("fmla", "val 8000")
+    # Square corners + NO outline (BP-COVER-BAND-CLEAN): the prior rounded ends +
+    # 1.5pt amber outline rendered as a broken-looking bordered pill over the
+    # square paragraph shading; a flush solid navy bar reads as design, with the
+    # amber accent carried by the host paragraph's bottom rule alone.
+    geom.set("prst", "rect")
+    etree.SubElement(geom, f"{{{A}}}avLst")
     fill = etree.SubElement(sppr, f"{{{A}}}solidFill")
     etree.SubElement(fill, f"{{{A}}}srgbClr").set("val", BRAND_NAVY)
     ln = etree.SubElement(sppr, f"{{{A}}}ln")
-    ln.set("w", "19050")
-    lnfill = etree.SubElement(ln, f"{{{A}}}solidFill")
-    etree.SubElement(lnfill, f"{{{A}}}srgbClr").set("val", BRAND_AMBER)
+    etree.SubElement(ln, f"{{{A}}}noFill")
     bodypr = etree.SubElement(wsp, f"{{{WPS}}}bodyPr")
     bodypr.set("rtlIns", "0")
     bodypr.set("bIns", "0")
@@ -1295,6 +1307,7 @@ def _build_cover_kpi_summary(doc):
         noVBand="1",
     )
     _table_cellmar(table)  # DOCX-D2 (inserted before the tblLook above)
+    _table_repeat_header(table)  # BP-TBL-HEADER
     rows = [
         ("Templates audited", "3"),
         ("Roles captured", "14"),
@@ -1527,6 +1540,7 @@ def _build_table(doc):
         noVBand="1",
     )
     _table_cellmar(table)  # DOCX-D2 (inserted before the tblLook above)
+    _table_repeat_header(table)  # BP-TBL-HEADER
     hdr = ("Quarter", "Revenue", "Growth", "Region")
     for c, label in zip(table.rows[0].cells, hdr):
         c.text = label
@@ -1618,6 +1632,7 @@ def _build_risk_matrix(doc):
         noVBand="1",
     )
     _table_cellmar(table)  # DOCX-D2 (inserted before the tblLook above)
+    _table_repeat_header(table)  # BP-TBL-HEADER
     headers = ("Area", "Signal", "Owner", "Mitigation")
     for c, label in zip(table.rows[0].cells, headers):
         c.text = label
@@ -1883,6 +1898,28 @@ def _add_two_column_section(doc):
         color=BRAND_NAVY,
         size_hp=22,
     )
+    # BP-TWOCOL-BALANCE: enough copy to flow into the SECOND column; with only the
+    # two paragraphs above, the right column rendered empty next to a bare
+    # separator rule and the synopsis page looked unfinished.
+    _pr(
+        doc,
+        "The brand profile records what the template proves: named styles, theme "
+        "colors and fonts, table conventions, list numbering, paragraph spacing, "
+        "cover slots, and the index front matter that regenerates from new "
+        "content.",
+        font="Calibri",
+        color=BRAND_NAVY,
+        size_hp=22,
+    )
+    _pr(
+        doc,
+        "Every captured fact is verified against this file before it is ever "
+        "applied, so a generated document can only use what the template itself "
+        "defines. That is the whole contract, in two columns.",
+        font="Calibri",
+        color=BRAND_NAVY,
+        size_hp=22,
+    )
     return section
 
 
@@ -1913,6 +1950,17 @@ def _add_landscape_section(doc, curve_rid=None, fig_cx=0, fig_cy=0):
     # Swap page width/height for landscape (python-docx does not auto-swap).
     new_section.page_width = Twips(15840)  # 11"
     new_section.page_height = Twips(12240)  # 8.5"
+    # BP-LANDSCAPE-COLS: python-docx creates a new section by COPYING the previous
+    # sectPr, so without this the landscape appendix would inherit the two-column
+    # synopsis layout (matrix squeezed into the left half + a stray separator).
+    cols = new_section._sectPr.find(_w("cols"))
+    if cols is None:
+        cols = _sub(new_section._sectPr, "cols")
+    for key in list(cols.attrib):
+        del cols.attrib[key]
+    for child in list(cols):
+        cols.remove(child)
+    cols.set(_w("num"), "1")
     _p(doc, "BrandDocs landscape appendix", "Heading1")
     doc.add_paragraph(
         "This appendix sits in a landscape section. It carries a wide program "
@@ -1937,9 +1985,14 @@ def _add_landscape_section(doc, curve_rid=None, fig_cx=0, fig_cy=0):
         noVBand="1",
     )
     _table_cellmar(wide)  # DOCX-D2 (inserted before the tblLook above)
+    _table_repeat_header(wide)  # BP-TBL-HEADER
     whdr = ("Workstream", "Owner", "Q1", "Q2", "Q3", "Q4", "Status")
     for c, label in zip(wide.rows[0].cells, whdr):
         c.text = label
+        # BP-LANDSCAPE-HEADER: white header runs over the navy header fill (the
+        # same DOCX-A4 treatment the portrait tables get via _brand_table_body;
+        # without it the labels rendered navy-on-navy, i.e. invisible).
+        _brand_runs(c.paragraphs[0], font="Arial", color=WHITE)
     wdata = [
         (
             "Template surface",

@@ -1283,8 +1283,65 @@ def build(out: Path = OUT) -> Path:
     buf = BytesIO()
     prs.save(buf)
     out.write_bytes(buf.getvalue())
+    _fix_notes_master_id_lst(out)
     freeze_ooxml(out)
     return out
+
+
+def _fix_notes_master_id_lst(path: Path) -> None:
+    """Repair a python-pptx omission that strict importers reject (Keynote).
+
+    Touching ``slide.notes_slide`` makes python-pptx create the notesMaster part
+    + its theme + the presentation-level RELATIONSHIP, but it never declares the
+    master in ``p:notesMasterIdLst`` inside ``presentation.xml``. PowerPoint,
+    LibreOffice and Quick Look tolerate the orphan; Keynote rejects the whole
+    package as an invalid format (ECMA-376 expects the id list). This post-save
+    pass adds the missing ``p:notesMasterIdLst`` (spec-ordered, right after
+    ``p:sldMasterIdLst``) pointing at the existing relationship id. A no-op when
+    no notesMaster part exists or the list is already present, and fully
+    deterministic (runs BEFORE ``freeze_ooxml``)."""
+    import zipfile
+
+    from lxml import etree
+
+    P = "http://schemas.openxmlformats.org/presentationml/2006/main"
+    RAPP = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    RPKG = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+
+    with zipfile.ZipFile(path) as zin:
+        names = zin.namelist()
+        if "ppt/notesMasters/notesMaster1.xml" not in names:
+            return
+        pres = etree.fromstring(zin.read("ppt/presentation.xml"))
+        if pres.find(f"{{{P}}}notesMasterIdLst") is not None:
+            return
+        rels = etree.fromstring(zin.read("ppt/_rels/presentation.xml.rels"))
+        rid = None
+        for rel in rels.iter(f"{RPKG}Relationship"):
+            if "notesMaster" in (rel.get("Target") or ""):
+                rid = rel.get("Id")
+                break
+        if rid is None:
+            return
+        sld = pres.find(f"{{{P}}}sldMasterIdLst")
+        lst = etree.Element(f"{{{P}}}notesMasterIdLst")
+        etree.SubElement(lst, f"{{{P}}}notesMasterId").set(f"{{{RAPP}}}id", rid)
+        sld.addnext(lst)
+        new_pres = etree.tostring(
+            pres, xml_declaration=True, encoding="UTF-8", standalone=True
+        )
+        items = [
+            (
+                item,
+                new_pres
+                if item.filename == "ppt/presentation.xml"
+                else zin.read(item.filename),
+            )
+            for item in zin.infolist()
+        ]
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item, data in items:
+            zout.writestr(item, data)
 
 
 if __name__ == "__main__":

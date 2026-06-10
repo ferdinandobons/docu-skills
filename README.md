@@ -35,6 +35,7 @@
 | **Works with** | Claude Code, Codex, compatible AI agents, or the direct Python CLI |
 | **Best for** | Repeatable reports, decks, workbooks, proposals, memos, briefs, and internal document workflows |
 | **Privacy model** | Local-first; no cloud service is required, and real templates are git-ignored |
+| **Speed** | First run on a new template: up to ~15 min end to end (extract + model comprehension + visual QA); every later document from the saved profile: seconds |
 | **Current release** | [v0.8.0](https://github.com/ferdinandobons/brand-docs/releases/tag/v0.8.0) alpha |
 
 ---
@@ -108,6 +109,8 @@ Restart or reload the agent if the skills don't appear immediately.
 > "Use this company Word template and write a report on the history of Napoleon."
 
 The agent activates `brand-docx`, extracts (or reuses) a Brand Profile, fills the template shell in its structural order, runs QA, and returns the file. PowerPoint (`brand-pptx`) and Excel (`brand-xlsx`) work the same way.
+
+**How long does it take?** The FIRST run on a new template is the slow one: extraction, the optional model comprehension, content authoring and the visual QA gate (plus any repair round) can take up to ~15 minutes end to end with an AI agent. Every later document from the saved profile takes seconds. Still a fraction of formatting the document by hand, and you get a faithful file instead of an approximate one.
 
 **Direct CLI** (the engine, for tests & debugging). No template at hand? Try the
 shipped synthetic example: `examples/templates/branddocs_template.docx` (also
