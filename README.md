@@ -35,7 +35,7 @@
 | **Works with** | Claude Code, Codex, compatible AI agents, or the direct Python CLI |
 | **Best for** | Repeatable reports, decks, workbooks, proposals, memos, briefs, and internal document workflows |
 | **Privacy model** | Local-first; no cloud service is required, and real templates are git-ignored |
-| **Current release** | [v0.7.0](https://github.com/ferdinandobons/brand-docs/releases/tag/v0.7.0) alpha |
+| **Current release** | [v0.8.0](https://github.com/ferdinandobons/brand-docs/releases/tag/v0.8.0) alpha |
 
 ---
 
@@ -139,7 +139,7 @@ The input (`idoc.json`) is an **IntermediateDocument** of brand-agnostic typed b
 
 ## Changelog
 
-Latest release: [v0.7.0](https://github.com/ferdinandobons/brand-docs/releases/tag/v0.7.0). See [CHANGELOG.md](CHANGELOG.md).
+Latest release: [v0.8.0](https://github.com/ferdinandobons/brand-docs/releases/tag/v0.8.0). See [CHANGELOG.md](CHANGELOG.md).
 
 ## License, citation & acknowledgements
 

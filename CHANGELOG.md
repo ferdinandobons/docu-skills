@@ -2,7 +2,7 @@
 
 All notable changes to BrandDocs are documented in this file.
 
-## [Unreleased]
+## [0.8.0] - 2026-06-10
 
 ### Performance
 
@@ -764,6 +764,7 @@ Initial public alpha release.
   share the same engine and are intentionally catching up through the eval
   suite and visual repair workflow.
 
+[0.8.0]: https://github.com/ferdinandobons/brand-docs/releases/tag/v0.8.0
 [0.7.0]: https://github.com/ferdinandobons/brand-docs/releases/tag/v0.7.0
 [0.6.2]: https://github.com/ferdinandobons/brand-docs/releases/tag/v0.6.2
 [0.6.1]: https://github.com/ferdinandobons/brand-docs/releases/tag/v0.6.1
