@@ -31,7 +31,7 @@
 
   <rect width="1280" height="540" rx="22" fill="url(#bg)"/>
   <rect x="1" y="1" width="1278" height="538" rx="22" fill="none" stroke="#FFFFFF" stroke-opacity="0.07"/>
-  <ellipse cx="640" cy="285" rx="260" ry="185" fill="url(#glow)"/>
+  <ellipse cx="595" cy="285" rx="260" ry="185" fill="url(#glow)"/>
 
   <!-- TOP BAND -->
   <text x="48" y="72" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, sans-serif" font-size="42" font-weight="800" letter-spacing="-0.5" fill="#FFFFFF">Brand<tspan fill="#6EA8FE">Docs</tspan></text>
@@ -39,6 +39,7 @@
   <text x="1232" y="74" text-anchor="end" font-family="ui-sans-serif, system-ui, sans-serif" font-size="17" font-weight="600" fill="#C9D8F5">that actually follow your templates.</text>
 
   <!-- LEFT: the one company template (page with dog-ear) -->
+  <g transform="translate(30 0)">
   <path d="M 92 170 H 206 L 240 204 V 358 Q 240 370 228 370 H 92 Q 80 370 80 358 V 182 Q 80 170 92 170 Z" fill="#18223F" stroke="#33467A" stroke-width="2"/>
   <path d="M 206 170 L 240 204 H 216 Q 206 204 206 194 Z" fill="#2A3A63" stroke="#33467A" stroke-width="2" stroke-linejoin="round"/>
   <rect x="96" y="184" width="14" height="14" rx="3" fill="#2B7CD3"/>
@@ -52,22 +53,24 @@
   <rect x="96" y="326" width="94" height="7" rx="3.5" fill="#283455"/>
   <text x="160" y="400" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#9DB4E8">your company template</text>
   <text x="160" y="420" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#6E84B8">.docx &#183; .pptx &#183; .xlsx</text>
+  </g>
 
   <!-- EXTRACT flow: brand atoms fly out of the template into the core -->
   <circle cx="346" cy="181" r="12" fill="#6EA8FE"/>
   <text x="346" y="186" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800" fill="#0B1022">1</text>
   <text x="366" y="186" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13.5" font-weight="700" letter-spacing="2.5" fill="#9DC0FF">EXTRACT</text>
-  <path d="M 248 225 C 330 200, 430 215, 549 249" stroke="url(#flowL)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipL)"/>
-  <path d="M 248 272 C 340 272, 440 278, 551 284" stroke="url(#flowL)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipL)"/>
-  <path d="M 248 318 C 330 345, 430 330, 549 321" stroke="url(#flowL)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipL)"/>
-  <rect x="312" y="207" width="11" height="11" rx="3" fill="#2B7CD3" transform="rotate(12 317 212)"/>
-  <text x="396" y="219" font-family="Georgia, 'Times New Roman', serif" font-size="15" font-weight="700" fill="#EAF1FF">Aa</text>
-  <rect x="348" y="263" width="10" height="10" rx="3" fill="#E0742B" transform="rotate(-10 353 268)"/>
-  <circle cx="456" cy="277" r="5" fill="#F472B6"/>
-  <rect x="336" y="327" width="10" height="10" rx="3" fill="#2BA45F" transform="rotate(8 341 332)"/>
-  <rect x="416" y="323" width="18" height="5" rx="2.5" fill="#5778B0" transform="rotate(-6 425 325)"/>
+  <path d="M 278 225 C 345 205, 420 218, 504 250" stroke="url(#flowL)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipL)"/>
+  <path d="M 278 272 C 350 272, 425 278, 506 284" stroke="url(#flowL)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipL)"/>
+  <path d="M 278 318 C 345 340, 420 330, 504 320" stroke="url(#flowL)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipL)"/>
+  <rect x="328" y="209" width="11" height="11" rx="3" fill="#2B7CD3" transform="rotate(12 333 214)"/>
+  <text x="398" y="222" font-family="Georgia, 'Times New Roman', serif" font-size="15" font-weight="700" fill="#EAF1FF">Aa</text>
+  <rect x="358" y="264" width="10" height="10" rx="3" fill="#E0742B" transform="rotate(-10 363 269)"/>
+  <circle cx="442" cy="278" r="5" fill="#F472B6"/>
+  <rect x="344" y="328" width="10" height="10" rx="3" fill="#2BA45F" transform="rotate(8 349 333)"/>
+  <rect x="414" y="324" width="18" height="5" rx="2.5" fill="#5778B0" transform="rotate(-6 423 326)"/>
 
   <!-- CORE: the Brand Profile -->
+  <g transform="translate(-45 0)">
   <path d="M 640 200 L 713.6 242.5 V 327.5 L 640 370 L 566.4 327.5 V 242.5 Z" fill="#16213F" stroke="url(#accent)" stroke-width="2.5" stroke-linejoin="round"/>
   <text x="640" y="268" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" fill="#EAF1FF">Aa</text>
   <rect x="603" y="282" width="14" height="14" rx="4" fill="#2B7CD3"/>
@@ -82,19 +85,20 @@
   <text x="708" y="233" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#6FD79E">&#10003;</text>
   <text x="640" y="404" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="19" font-weight="700" fill="#FFFFFF">Brand Profile</text>
   <text x="640" y="426" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11.5" fill="#8FA6D8">colors &#183; fonts &#183; styles &#183; structure &#183; layouts &#183; logos</text>
+  </g>
 
   <!-- GENERATE flow: the core fans out into unlimited documents -->
-  <circle cx="784" cy="181" r="12" fill="#6EA8FE"/>
-  <text x="784" y="186" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800" fill="#0B1022">3</text>
-  <text x="804" y="186" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13.5" font-weight="700" letter-spacing="2.5" fill="#9DC0FF">GENERATE</text>
-  <path d="M 716 252 C 790 218, 845 212, 898 234" stroke="url(#flowR)" stroke-width="2" stroke-linecap="round" marker-end="url(#tipR)"/>
-  <path d="M 716 268 C 800 248, 855 250, 906 262" stroke="url(#flowR)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipR)"/>
-  <path d="M 718 285 C 810 285, 865 288, 908 291" stroke="url(#flowR)" stroke-width="2.4" stroke-linecap="round" marker-end="url(#tipR)"/>
-  <path d="M 716 302 C 800 322, 855 324, 906 318" stroke="url(#flowR)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipR)"/>
-  <path d="M 716 318 C 790 352, 845 358, 898 346" stroke="url(#flowR)" stroke-width="2" stroke-linecap="round" marker-end="url(#tipR)"/>
-  <circle cx="793" cy="231" r="2.5" fill="#6EA8FE"/>
-  <circle cx="818" cy="287" r="2.5" fill="#6EA8FE"/>
-  <circle cx="790" cy="336" r="2.5" fill="#6EA8FE"/>
+  <circle cx="731" cy="181" r="12" fill="#6EA8FE"/>
+  <text x="731" y="186" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="800" fill="#0B1022">3</text>
+  <text x="751" y="186" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13.5" font-weight="700" letter-spacing="2.5" fill="#9DC0FF">GENERATE</text>
+  <path d="M 671 252 C 750 215, 825 212, 898 234" stroke="url(#flowR)" stroke-width="2" stroke-linecap="round" marker-end="url(#tipR)"/>
+  <path d="M 671 268 C 760 246, 835 250, 906 262" stroke="url(#flowR)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipR)"/>
+  <path d="M 673 285 C 770 285, 845 288, 908 291" stroke="url(#flowR)" stroke-width="2.4" stroke-linecap="round" marker-end="url(#tipR)"/>
+  <path d="M 671 302 C 760 324, 835 324, 906 318" stroke="url(#flowR)" stroke-width="2.2" stroke-linecap="round" marker-end="url(#tipR)"/>
+  <path d="M 671 318 C 750 355, 825 358, 898 346" stroke="url(#flowR)" stroke-width="2" stroke-linecap="round" marker-end="url(#tipR)"/>
+  <circle cx="770" cy="227" r="2.5" fill="#6EA8FE"/>
+  <circle cx="800" cy="287" r="2.5" fill="#6EA8FE"/>
+  <circle cx="770" cy="341" r="2.5" fill="#6EA8FE"/>
 
   <!-- RIGHT: fan of generated on-brand documents -->
   <!-- ghost pages (the "unlimited" tail) -->
