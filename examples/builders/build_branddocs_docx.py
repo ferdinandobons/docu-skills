@@ -96,6 +96,12 @@ BRAND_AMBER = "E0742B"
 BRAND_LIGHT = "EAF1FF"
 BRAND_BAND = "DCE7FF"
 WHITE = "FFFFFF"
+# DOCX-E1: an OFF-THEME brand accent - deliberately NOT a clrScheme slot (every
+# other brand hex above is mapped into the theme by _rewrite_theme_clrscheme), so
+# the extractor captures it as a hex:RRGGBB palette entry. That entry is exactly
+# what the E1 palette-alias channel names (the model proposes an alias token; the
+# engine byte-copies this captured ref).
+BRAND_CORAL = "C24D2B"
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +229,110 @@ def _brand_table_body(table, *, header_color=WHITE, body_color=BRAND_NAVY):
                     _brand_runs(para, font="Arial", color=header_color)
                 else:
                     _brand_runs(para, font="Calibri", color=body_color, size_hp=22)
+
+
+def _table_cellmar(table, *, side_twips=115):
+    """DOCX-D2: declare the brand's table CELL MARGINS on the table's OWN ``tblPr``.
+
+    The D2 capture reads ``w:tblCellMar`` from the template's table instances (a
+    DECLARED fact, like ``w:tblLook``), so stamping the same left/right margins on
+    every body table makes the convention dominant and capturable into
+    ``role.appearance.table.cell_margins`` / ``theme.table.body``. Inserted BEFORE
+    any existing ``w:tblLook`` to keep the CT_TblPr child order spec-valid."""
+    tblPr = table._tbl.tblPr
+    mar = _el("tblCellMar")
+    for side in ("left", "right"):
+        _sub(mar, side, w=str(side_twips), type="dxa")
+    look = tblPr.find(_w("tblLook"))
+    if look is not None:
+        look.addprevious(mar)
+    else:
+        tblPr.append(mar)
+
+
+def _stamp_body_geometry(doc) -> None:
+    """DOCX-D1: stamp the brand's DIRECT paragraph-spacing convention on the body.
+
+    The D1 geometry capture samples DIRECT ``w:pPr`` per role under the same
+    dominance floor as typography, so the convention must live on the paragraphs
+    (not only in named styles). Every top-level BODY paragraph (no ``w:pStyle`` =
+    the Normal/body role) gets ``w:spacing w:after="160"`` - 100% dominance, the
+    capturable brand fact. Paragraphs that already carry a direct spacing keep it
+    (set-only-when-unset, mirroring the engine's own apply discipline); styled
+    paragraphs (headings, lists, callouts...) are untouched. Runs LAST in build()
+    so every body paragraph is swept."""
+    for paragraph in doc.paragraphs:
+        pp = paragraph._p
+        pPr = pp.find(_w("pPr"))
+        if pPr is not None and pPr.find(_w("pStyle")) is not None:
+            continue  # styled paragraph: not the body role
+        if pPr is None:
+            pPr = _el("pPr")
+            pp.insert(0, pPr)
+        if pPr.find(_w("spacing")) is None:
+            # CT_PPr order: spacing precedes jc/ind; with only jc possibly present,
+            # inserting first keeps the sequence spec-valid.
+            pPr.insert(0, _el("spacing", after="160"))
+
+
+# The paragraph styles whose runs read at BODY size in this template: the body
+# itself (no pStyle = Normal), the two-level lists, and the cached index entries.
+# Heading/caption/lead/quote/callout runs are deliberately excluded (their look is
+# intentionally NOT the body convention).
+_BODY_RUN_STYLE_IDS = frozenset(
+    {
+        None,
+        "Normal",
+        "BrandDocsBulletL1",
+        "BrandDocsBulletL2",
+        "BrandDocsNumberL1",
+        "ListParagraph",
+        "TOC1",
+        "TOC2",
+        # Captions and figure/table-index entries render at the docDefaults body
+        # size (22hp) already; making that explicit keeps the look byte-for-byte
+        # while letting the body dominance hold over the TOP-LEVEL run sample the
+        # capture actually reads (doc.paragraphs excludes table cells).
+        "Caption",
+        "TableofFigures",
+    }
+)
+
+
+def _stamp_body_runs(doc) -> None:
+    """DOCX-A4/E2: make the brand BODY run convention (Calibri / 22hp / navy)
+    EXPLICIT and DOMINANT across the document, set-only-when-unset.
+
+    The body-appearance capture (``theme.fonts.body`` / ``theme.text.body``) and
+    the E2 pseudo-heading detector both key on the DOMINANT explicit run values
+    over ALL runs (inherit votes count against dominance), the way a designed
+    corporate template really carries its look. This sweep walks EVERY text run in
+    the document body (table cells included) whose paragraph style reads at body
+    size and stamps the convention only where the axis is UNSET - so the white
+    table headers, the teal accents, the coral off-theme run, and the 36hp faked
+    heading all keep their explicit values and stay outliers/minorities."""
+    body = doc.element.body
+    for p in body.iter(_w("p")):
+        pPr = p.find(_w("pPr"))
+        style = pPr.find(_w("pStyle")) if pPr is not None else None
+        style_id = style.get(_w("val")) if style is not None else None
+        if style_id not in _BODY_RUN_STYLE_IDS:
+            continue
+        for r in p.iter(_w("r")):
+            t = r.find(_w("t"))
+            if t is None or not (t.text or "").strip():
+                continue
+            rPr = r.find(_w("rPr"))
+            if rPr is None:
+                rPr = _el("rPr")
+                r.insert(0, rPr)
+            if rPr.find(_w("rFonts")) is None:
+                rPr.append(_el("rFonts", ascii="Calibri", hAnsi="Calibri"))
+            if rPr.find(_w("color")) is None:
+                rPr.append(_el("color", val=BRAND_NAVY))
+            if rPr.find(_w("sz")) is None:
+                rPr.append(_el("sz", val="22"))
+                rPr.append(_el("szCs", val="22"))
 
 
 def _pr(doc, text, style_id=None, *, font=None, color=None, size_hp=None):
@@ -1147,6 +1257,7 @@ def _build_cover_scorecard(doc):
     """
     table = doc.add_table(rows=2, cols=3)
     table.style = "BrandDocs Table"
+    _table_cellmar(table)  # DOCX-D2
     _set_col_widths(table, (2160, 2160, 2160))
     labels = ("Brand health", "Template coverage", "Audit posture")
     for cell, label in zip(table.rows[0].cells, labels):
@@ -1183,6 +1294,7 @@ def _build_cover_kpi_summary(doc):
         noHBand="1",
         noVBand="1",
     )
+    _table_cellmar(table)  # DOCX-D2 (inserted before the tblLook above)
     rows = [
         ("Templates audited", "3"),
         ("Roles captured", "14"),
@@ -1414,6 +1526,7 @@ def _build_table(doc):
         noHBand="0",
         noVBand="1",
     )
+    _table_cellmar(table)  # DOCX-D2 (inserted before the tblLook above)
     hdr = ("Quarter", "Revenue", "Growth", "Region")
     for c, label in zip(table.rows[0].cells, hdr):
         c.text = label
@@ -1504,6 +1617,7 @@ def _build_risk_matrix(doc):
         noHBand="0",
         noVBand="1",
     )
+    _table_cellmar(table)  # DOCX-D2 (inserted before the tblLook above)
     headers = ("Area", "Signal", "Owner", "Mitigation")
     for c, label in zip(table.rows[0].cells, headers):
         c.text = label
@@ -1579,6 +1693,28 @@ def _build_demo_body(doc):
         color=BRAND_NAVY,
         size_hp=22,
     )
+    # DOCX-E2: a FAKED heading - a body (Normal) paragraph whose runs are visibly
+    # larger (36hp vs the 22hp dominant body) and off-body colored (teal vs navy),
+    # exactly the outlier shape detect_pseudo_headings surfaces as a
+    # theme.pseudo_headings candidate for the model's promote_appearance
+    # adjudication. Deliberately NOT a named heading style.
+    _pr(doc, "Key takeaways", font="Arial", color=BRAND_TEAL, size_hp=36)
+    # DOCX-E1: an off-theme coral accent on a MINORITY run (one run; the navy body
+    # stays dominant), captured as a hex:C24D2B palette entry - the alias channel's
+    # raw material.
+    coral_p = doc.add_paragraph(
+        "Templates capture conventions, not content; the accent reserved for "
+    )
+    _brand_runs(coral_p, font="Calibri", color=BRAND_NAVY, size_hp=22)
+    accent_run = coral_p.add_run("product callouts")
+    tail_run = coral_p.add_run(" never bleeds into body copy.")
+    from docx.shared import Pt as _Pt
+    from docx.shared import RGBColor as _RGB
+
+    for run, hexval in ((accent_run, BRAND_CORAL), (tail_run, BRAND_NAVY)):
+        run.font.name = "Calibri"
+        run.font.size = _Pt(11)
+        run.font.color.rgb = _RGB.from_string(hexval)
     # A real external hyperlink (w:hyperlink -> external relationship): a near-
     # universal template element, and one the generator now authors natively too.
     link_p = doc.add_paragraph("Full brand guidelines: ")
@@ -1800,6 +1936,7 @@ def _add_landscape_section(doc, curve_rid=None, fig_cx=0, fig_cy=0):
         noHBand="0",
         noVBand="1",
     )
+    _table_cellmar(wide)  # DOCX-D2 (inserted before the tblLook above)
     whdr = ("Workstream", "Owner", "Q1", "Q2", "Q3", "Q4", "Status")
     for c, label in zip(wide.rows[0].cells, whdr):
         c.text = label
@@ -1972,6 +2109,16 @@ def build(out: Path = OUT) -> Path:
     _add_landscape_section(
         doc, curve_rid=doc_curve_rid, fig_cx=land_fig_cx, fig_cy=land_fig_cy
     )
+
+    # 7b) DOCX-D1: sweep the brand's direct paragraph-spacing convention onto every
+    # body (Normal) paragraph, AFTER all content exists, so the geometry capture
+    # sees a dominant direct w:pPr fact.
+    _stamp_body_geometry(doc)
+    # 7c) DOCX-A4/E2: make the body RUN convention explicit and dominant
+    # (set-only-when-unset; accents/headers/faked-heading keep their own values),
+    # so theme.fonts.body / theme.text.body capture and the pseudo-heading
+    # detector has its baseline.
+    _stamp_body_runs(doc)
 
     # 8) Ask Word to refresh the cached fields on open.
     _request_update_fields(doc)

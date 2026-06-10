@@ -57,6 +57,19 @@ short-circuit extension) are documented - not applied - in
 
 ### Added
 
+- **Example docx template now exercises every new capture axis.** The synthetic
+  `examples/templates/branddocs_template.docx` (rebuilt byte-deterministically from
+  its builder) now carries: a dominant DIRECT paragraph-spacing convention
+  (`w:spacing w:after="160"` on every body paragraph - D1 geometry capture), declared
+  `w:tblCellMar` on all five tables alongside the existing `w:tblLook` (D2 table
+  capture: `cell_margins` + `style_id` + `tblLook` all captured), an explicit dominant
+  body run convention (Calibri/22hp/navy, set-only-when-unset so headers/accents keep
+  their look) that gives `theme.fonts.body` / `theme.text.body` their baseline, an
+  off-theme coral accent run (`hex:C24D2B` palette entry - the E1 alias channel's raw
+  material), and a FAKED heading (36hp teal body-style paragraph) that the E2
+  detector surfaces as a `pseudo_heading` candidate (together with the coral run, a
+  realistic adjudication case for the model). The pptx/xlsx examples already carry
+  off-theme `hex:` palette entries, so E1 is exercisable on all three formats.
 - **Universal cover synthesis for `AnchorKind.NONE` (Cluster E4).** A template whose
   cover-anchor detection recorded the structural fact `anchors.cover.kind == NONE` (no SDT
   title slot, no cover-layout placeholder, no anchorable cover structure) previously hit a
