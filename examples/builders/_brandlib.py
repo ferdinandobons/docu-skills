@@ -35,25 +35,33 @@ _BRAND_NAVY_HEX = "16213F"  # navy   -> dk1 (text)
 _BRAND_TEAL_HEX = "2B7CD3"  # teal   -> accent1 (primary) + hlink
 _BRAND_AMBER_HEX = "E0742B"  # amber  -> accent4 (danger) + accent2 + folHlink
 _BRAND_LIGHT_HEX = "EAF1FF"  # light  -> lt1 (surface)
+_BRAND_BAND_HEX = "DCE7FF"  # pale band tint -> accent3
 
 
 def brand_theme_slots() -> dict[str, str]:
-    """Frozen ``clrScheme`` slot -> 6-digit hex map for the 4 BrandDocs colors.
+    """Frozen ``clrScheme`` slot -> 6-digit hex map: ALL 12 canonical slots.
 
-    Additive, deterministic, side-effect free. A new helper (no existing
-    signature touched) that any builder may import to drive its in-place
-    ``theme1.xml`` clrScheme rewrite from a single source of truth, so the four
-    BrandDocs hexes can never drift apart across the .docx / .pptx / .xlsx
-    themes. Keys are the canonical DrawingML theme slots the extractor reads;
-    values are bare ``RRGGBB`` (no ``#``, no leading ``FF``). Returns a fresh
-    dict each call so a caller mutating the result can never corrupt the map.
+    Deterministic, side-effect free, and COMPLETE: every builder rewrites its
+    ``theme1.xml`` clrScheme from this one map verbatim, so the three example
+    templates model ONE brand (``compare-profiles`` on any pair must report
+    zero theme-color drift; a general-review pass found the builders had
+    drifted apart on five supporting slots). Keys are the canonical DrawingML
+    theme slots the extractor reads; values are bare ``RRGGBB`` (no ``#``, no
+    leading ``FF``). The supporting tones reuse the four core colors (the docx
+    reference template's choices). Returns a fresh dict each call so a caller
+    mutating the result can never corrupt the map.
     """
     return {
         "dk1": _BRAND_NAVY_HEX,
         "lt1": _BRAND_LIGHT_HEX,
+        "dk2": _BRAND_TEAL_HEX,
+        "lt2": _BRAND_LIGHT_HEX,
         "accent1": _BRAND_TEAL_HEX,
         "accent2": _BRAND_AMBER_HEX,
+        "accent3": _BRAND_BAND_HEX,
         "accent4": _BRAND_AMBER_HEX,
+        "accent5": _BRAND_TEAL_HEX,
+        "accent6": _BRAND_AMBER_HEX,
         "hlink": _BRAND_TEAL_HEX,
         "folHlink": _BRAND_AMBER_HEX,
     }

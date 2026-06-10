@@ -96,26 +96,11 @@ WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 # ---------------------------------------------------------------------------
 # Full 12-slot BrandDocs clrScheme map for the in-place theme1.xml rewrite
-# (PPTX-A1). The four core hexes come from the SHARED ``_brandlib`` source of
-# truth (``brand_theme_slots``) so the deck palette can never drift from the
-# docx/xlsx themes; the remaining slots (dk2/lt2/accent3/accent5/accent6) are
-# brand-derived supporting tones. Bare 6-digit RRGGBB (no '#', no leading FF).
+# (PPTX-A1), consumed VERBATIM from the shared ``_brandlib`` source of truth:
+# the three example templates model ONE brand, so compare-profiles on any pair
+# reports zero theme-color drift. Bare 6-digit RRGGBB (no '#', no leading FF).
 # ---------------------------------------------------------------------------
-_SHARED_SLOTS = brand_theme_slots()
-BRAND_CLRSCHEME = {
-    "dk1": _SHARED_SLOTS["dk1"],  # navy   16213F (text)
-    "lt1": "FFFFFF",  # white surface
-    "dk2": _SHARED_SLOTS["accent1"],  # teal   2B7CD3 (secondary dark)
-    "lt2": _SHARED_SLOTS["lt1"],  # light  EAF1FF
-    "accent1": _SHARED_SLOTS["accent1"],  # teal   2B7CD3 (primary)
-    "accent2": _SHARED_SLOTS["accent2"],  # amber  E0742B
-    "accent3": "DCE7FF",  # pale blue tint
-    "accent4": "5778B0",  # slate (brand-derived)
-    "accent5": "1F3A6B",  # deep navy-blue (brand-derived)
-    "accent6": "8FA9D8",  # soft periwinkle (brand-derived)
-    "hlink": _SHARED_SLOTS["hlink"],  # teal   2B7CD3
-    "folHlink": _SHARED_SLOTS["dk1"],  # navy   16213F
-}
+BRAND_CLRSCHEME = brand_theme_slots()
 
 # BrandDocs theme typography pairing for the fontScheme rewrite (PPTX-A2):
 # Arial (major / headings) + Calibri (minor / body).

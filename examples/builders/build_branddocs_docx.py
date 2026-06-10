@@ -429,22 +429,9 @@ def _rewrite_theme_clrscheme(scheme) -> None:
     BrandDocs navy/light directly. Slots not named by the brand map keep a sensible
     branded value so every clrScheme child resolves to a real BrandDocs-family hex.
     """
-    slots = brand_theme_slots()  # dk1/lt1/accent1/accent2/accent4/hlink/folHlink
-    # Fill the remaining canonical slots so every child carries an explicit srgb.
-    full = {
-        "dk1": slots["dk1"],
-        "lt1": slots["lt1"],
-        "dk2": BRAND_TEAL,
-        "lt2": BRAND_LIGHT,
-        "accent1": slots["accent1"],
-        "accent2": slots["accent2"],
-        "accent3": BRAND_BAND,
-        "accent4": slots["accent4"],
-        "accent5": BRAND_TEAL,
-        "accent6": BRAND_AMBER,
-        "hlink": slots["hlink"],
-        "folHlink": slots["folHlink"],
-    }
+    # The COMPLETE 12-slot brand map from the shared source of truth: all three
+    # example builders consume it verbatim, so the templates model one brand.
+    full = brand_theme_slots()
     for slot, hexval in full.items():
         node = scheme.find(_a(slot))
         if node is None:

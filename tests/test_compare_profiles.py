@@ -200,18 +200,23 @@ class CompareCliTest(unittest.TestCase):
 
                 rc1, out1 = run([])
                 rc2, out2 = run([])
-                self.assertIn(rc1, (0, 1))
                 self.assertEqual((rc1, out1), (rc2, out2))  # deterministic
                 self.assertIn("verdict:", out1)
                 rcj, outj = run(["--json"])
                 parsed = json.loads(outj)
                 self.assertEqual(rcj, rc1)
-                self.assertIn(
-                    parsed["verdict"],
-                    (compare.VERDICT_ALIGNED, compare.VERDICT_DRIFT),
-                )
                 self.assertEqual(parsed["a"]["kind"], "docx")
                 self.assertEqual(parsed["b"]["kind"], "pptx")
+                # The shipped examples model ONE brand: every theme slot, font
+                # slot, and palette role the two profiles BOTH capture must
+                # agree (a builder palette drift here is a shipping defect -
+                # this exact assertion was a tautology when the general review
+                # caught five drifted slots).
+                self.assertEqual(parsed["theme_colors"]["differ"], {})
+                self.assertEqual(parsed["theme_colors"]["only_a"], {})
+                self.assertEqual(parsed["theme_colors"]["only_b"], {})
+                self.assertEqual(parsed["fonts"]["differ"], {})
+                self.assertEqual(parsed["palette_roles"]["differ"], {})
                 after = {
                     n: hashlib.sha256(
                         (Path(td) / "brand-kit" / n / "profile.json").read_bytes()

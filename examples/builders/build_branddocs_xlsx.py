@@ -949,22 +949,9 @@ _TEAL = _SLOTS["accent1"]  # 2B7CD3
 _AMBER = _SLOTS["accent2"]  # E0742B
 _LIGHTHEX = _SLOTS["lt1"]  # EAF1FF
 
-# Full BrandDocs clrScheme: navy text, white/light surfaces, teal primary, amber
-# danger, a light tint + two supporting blues for accent3-6, teal/navy hyperlinks.
-_CLRSCHEME = {
-    "dk1": _NAVY,
-    "lt1": "FFFFFF",
-    "dk2": _TEAL,
-    "lt2": _LIGHTHEX,
-    "accent1": _TEAL,
-    "accent2": _AMBER,
-    "accent3": "DCE7FF",
-    "accent4": "5778B0",
-    "accent5": "9CC0F0",
-    "accent6": "C7912B",
-    "hlink": _TEAL,
-    "folHlink": _NAVY,
-}
+# Full BrandDocs clrScheme, consumed VERBATIM from the shared source of truth:
+# the three example templates model ONE brand (zero compare-profiles drift).
+_CLRSCHEME = brand_theme_slots()
 
 
 def _rewrite_theme(xml: bytes) -> bytes:
